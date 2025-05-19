@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.1.0
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
-// @author       Sair Alexis
+// @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
 // @grant        GM_xmlhttpRequest
 // @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js
@@ -125,6 +125,16 @@
             let b = parseInt(hex.substring(4,6), 16);
             return `rgba(${r},${g},${b},${alpha})`;
         }
+        function getRankGlowFilter(baseRank, size = 'normal') {
+            if (baseRank === 'Platine') return size === 'big' ? 'drop-shadow(0 0 0px #7ed6dfcc) drop-shadow(0 0 14px #7ed6dfcc) drop-shadow(0 0 24px #7ed6df77)' : 'drop-shadow(0 0 0px #7ed6df88) drop-shadow(0 0 7px #7ed6df88) drop-shadow(0 0 12px #7ed6df44)';
+            if (baseRank === 'Or') return size === 'big' ? 'drop-shadow(0 0 0px #e6b800cc) drop-shadow(0 0 14px #e6b800cc) drop-shadow(0 0 24px #e6b80077)' : 'drop-shadow(0 0 0px #e6b80088) drop-shadow(0 0 7px #e6b80088) drop-shadow(0 0 12px #e6b80044)';
+            if (baseRank === 'Argent') return size === 'big' ? 'drop-shadow(0 0 0px #bfc1c2cc) drop-shadow(0 0 14px #bfc1c2cc) drop-shadow(0 0 24px #bfc1c277)' : 'drop-shadow(0 0 0px #bfc1c288) drop-shadow(0 0 7px #bfc1c288) drop-shadow(0 0 12px #bfc1c244)';
+            if (baseRank === 'Bronze') return size === 'big' ? 'drop-shadow(0 0 0px #cd7f32cc) drop-shadow(0 0 14px #cd7f32cc) drop-shadow(0 0 24px #cd7f3277)' : 'drop-shadow(0 0 0px #cd7f3288) drop-shadow(0 0 7px #cd7f3288) drop-shadow(0 0 12px #cd7f3244)';
+            if (baseRank === 'Diamant') return size === 'big' ? 'drop-shadow(0 0 0px #273c75cc) drop-shadow(0 0 14px #273c75cc) drop-shadow(0 0 24px #273c7577)' : 'drop-shadow(0 0 0px #273c7588) drop-shadow(0 0 7px #273c7588) drop-shadow(0 0 12px #273c7544)';
+            if (baseRank === 'Maître') return size === 'big' ? 'drop-shadow(0 0 0px #a020f0cc) drop-shadow(0 0 14px #a020f0cc) drop-shadow(0 0 24px #a020f077)' : 'drop-shadow(0 0 0px #a020f088) drop-shadow(0 0 7px #a020f088) drop-shadow(0 0 12px #a020f044)';
+            if (baseRank === 'DIEU') return size === 'big' ? 'drop-shadow(0 0 0px #d90429cc) drop-shadow(0 0 14px #d90429cc) drop-shadow(0 0 24px #d9042977)' : 'drop-shadow(0 0 0px #d9042988) drop-shadow(0 0 7px #d9042988) drop-shadow(0 0 12px #d9042944)';
+            return size === 'big' ? 'drop-shadow(0 0 0px #e0e0e0cc) drop-shadow(0 0 14px #e0e0e0cc) drop-shadow(0 0 24px #e0e0e077)' : 'drop-shadow(0 0 0px #e0e0e088) drop-shadow(0 0 7px #e0e0e088) drop-shadow(0 0 12px #e0e0e044)';
+        }
         function updateUI(userData) {
             // Badge flottant : paramètres globaux pour éviter ReferenceError
             const badgeSize = 80;
@@ -155,8 +165,8 @@
                 top: 32px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: ${hexToRgba(bgColor, 0.85)};
-                color: ${textColor};
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
                 padding: 18px 24px 24px 24px;
                 border-radius: 18px;
                 box-shadow: 0 0 48px 12px ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
@@ -177,12 +187,14 @@
             `;
             let panelContent = `
                 <div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:8px;">
-                    <div style="background:rgba(240,240,240,0.75);border-radius:12px;padding:6px;display:flex;align-items:center;justify-content:center;">
-                        <img src="${logo}" alt="Logo Rang" style="width:80px;height:80px;object-fit:contain;box-shadow:0 0 8px 1px ${color}55;border-radius:12px;background:transparent;"/>
+                    <div style="padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border-radius:0;">
+                        <img src="${logo}" alt="Logo Rang" style="width:110px;height:110px;object-fit:contain;border-radius:0;background:transparent;filter:${getRankGlowFilter(baseRank)};"/>
                     </div>
-                    <div style="font-size:1.1em;font-weight:bold;margin-top:2px;color:${textColor};text-shadow:0 0 8px #fff,0 0 16px ${color};">${currentRank.name}</div>
+                    <div style="font-size:1.1em;font-weight:bold;margin-top:2px;color:#f3f6fa;text-shadow:0 0 8px #fff,0 0 16px ${color};">${currentRank.name}</div>
                 </div>
-                ${nextRankXp ? `<div style=\"font-size:0.95em;color:#222;text-align:center;margin-bottom:4px;\">${nextRankXp} XP avant <b>${ranks[ranks.findIndex(r => r.name === currentRank.name)+1]?.name || ""}</b></div>` : ''}
+                ${nextRankXp ? `<div style="font-size:1.18em;font-weight:bold;color:#f3f6fa;text-align:center;margin-bottom:10px;text-shadow:0 1px 8px #fff,0 0 2px #0002;">
+  <span style='color:#26e0ce;font-size:1.22em;'>${nextRankXp} XP</span> avant <b style='color:#f3f6fa;'>${ranks[ranks.findIndex(r => r.name === currentRank.name)+1]?.name || ""}</b>
+</div>` : ''}
                 <div style="margin:14px 0 0 0;width:100%;">
                     <div style="background:#e5e5e5;border-radius:8px;height:14px;overflow:hidden;">
                         <div style="background:#4caf50;height:100%;width:${Math.round(progressCircle*100)}%;transition:width 0.5s;"></div>
@@ -234,7 +246,7 @@
                       fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - progressCircle * circumference}"
                       style="transition:stroke-dashoffset 0.5s;" stroke-linecap="round"/>
                   </svg>
-                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;box-shadow:0 0 0 3px ${color};margin:${(badgeSize-logoSize)/2}px;"/>
+                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;filter:${getRankGlowFilter(baseRank)};margin:${(badgeSize-logoSize)/2}px;"/>
                 `;
                 openBtn.title = 'Afficher le score';
                 openBtn.style.cssText = `
@@ -274,7 +286,7 @@
                       fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - progressCircle * circumference}"
                       style="transition:stroke-dashoffset 0.5s;" stroke-linecap="round"/>
                   </svg>
-                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;box-shadow:0 0 0 3px ${color};margin:${(badgeSize-logoSize)/2}px;"/>
+                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;filter:${getRankGlowFilter(baseRank)};margin:${(badgeSize-logoSize)/2}px;"/>
                 `;
                 openBtn.style.top = '0px';
                 openBtn.style.left = 'calc(50% - 160px)';
@@ -299,8 +311,8 @@
                 left: 50%;
                 transform: translate(-50%, -50%);
                 z-index: 10001;
-                background: ${hexToRgba(bgColor, 0.85)};
-                color: ${textColor};
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
                 border-radius: 28px;
                 box-shadow: 0 0 0 0 ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
                 padding: 56px 80px 48px 80px;
@@ -316,20 +328,20 @@
                 transition: background 0.5s, color 0.5s, box-shadow 0.5s;
             `;
             notif.innerHTML = `
-                <div style="font-size:1.2em;font-weight:bold;margin-bottom:10px;color:${textColor};text-shadow:0 0 8px #fff,0 0 16px ${bgColor};letter-spacing:1px;">🎉 Félicitations !</div>
-                <div style="font-size:1.1em;margin-bottom:18px;color:${textColor};">Passage à un rang supérieur</div>
+                <div style="font-size:1.2em;font-weight:bold;margin-bottom:10px;color:#f3f6fa;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};letter-spacing:1px;">🎉 Félicitations !</div>
+                <div style="font-size:1.1em;margin-bottom:18px;color:#f3f6fa;">Passage à un rang supérieur</div>
                 <div style="position:relative;width:100%;height:110px;display:flex;align-items:center;justify-content:center;">
                     <div id="old-rank" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:1;transition:opacity 0.7s, transform 0.7s cubic-bezier(.4,1.4,.6,1);display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <div style="background:rgba(240,240,240,0.75);border-radius:20px;padding:8px;display:flex;align-items:center;justify-content:center;">
-                            <img src="${logoOld}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;box-shadow:0 0 16px 2px ${bgColor}55;border-radius:16px;background:transparent;"/>
+                        <div style="padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border-radius:0;">
+                            <img src="${logoOld}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;filter:${getRankGlowFilter(baseOld, 'big')};border-radius:0;background:transparent;"/>
                         </div>
-                        <span style="color:${textColor};font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${oldRank.name}</span>
+                        <span style="color:#f3f6fa;font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${oldRank.name}</span>
                     </div>
                     <div id="new-rank" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translateX(80px) scale(0.5);opacity:0;transition:opacity 0.7s, transform 0.7s cubic-bezier(.4,1.4,.6,1);display:flex;flex-direction:column;align-items:center;gap:2px;">
-                        <div style="background:rgba(240,240,240,0.75);border-radius:20px;padding:8px;display:flex;align-items:center;justify-content:center;">
-                            <img src="${logoNew}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;box-shadow:0 0 16px 2px ${bgColor}55;border-radius:16px;background:transparent;"/>
+                        <div style="padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border-radius:0;">
+                            <img src="${logoNew}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;filter:${getRankGlowFilter(baseNew, 'big')};border-radius:0;background:transparent;"/>
                         </div>
-                        <span style="color:${textColor};font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${newRank.name}</span>
+                        <span style="color:#f3f6fa;font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${newRank.name}</span>
                     </div>
                 </div>
             `;
@@ -510,7 +522,7 @@
             if (notification) {
                 notification.remove();
             }
-            
+
             notification = document.createElement('div');
             notification.id = 'xp-gain-notification';
             notification.style.cssText = `
@@ -532,14 +544,14 @@
                 align-items: center;
                 gap: 8px;
             `;
-            
+
             notification.innerHTML = `
                 <span style="font-size: 1.2em;">✨</span>
                 <span>+${amount} XP</span>
             `;
-            
+
             document.body.appendChild(notification);
-            
+
             // Supprime la notification après l'animation
             setTimeout(() => {
                 notification.remove();
@@ -569,9 +581,46 @@
                                     (etatCloture && /cl[ôo]tur[ée]|résolu/i.test(etatCloture.textContent))
                                 ) {
                                     const userName = getCurrentUserName();
+                                    // Détection du nombre d'étoiles (Priorité)
+                                    let xp = 100;
+                                    let nbEtoiles = 0;
+                                    const prioriteRow = document.querySelector('.o_form_view .o_field_widget.o_field_priority, .o_form_view .o_priority, .o_form_view [name="priority"]');
+                                    if (prioriteRow) {
+                                        // Cherche les étoiles pleines (fa-star, o_rating_star_full, etc.)
+                                        nbEtoiles = prioriteRow.querySelectorAll('.fa-star, .o_rating_star_full, .o_priority_star.o_full').length;
+                                        if (nbEtoiles === 3) xp = 180;
+                                        else if (nbEtoiles === 2) xp = 140;
+                                        else if (nbEtoiles === 1) xp = 120;
+                                        else xp = 100;
+                                        console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp);
+                                    } else {
+                                        // Fallback couleur si jamais la priorité n'est pas trouvée
+                                        let titreElem = document.querySelector('.o_form_view input[name="name"], .o_form_view .o_field_widget.o_field_char, .o_form_view h1, .o_form_view .o_form_label');
+                                        let color = '';
+                                        if (titreElem) {
+                                            let el = titreElem;
+                                            while (el && el.classList && !el.classList.contains('o_form_view')) {
+                                                color = window.getComputedStyle(el).color;
+                                                if (color && color !== 'rgb(234, 234, 234)' && color !== 'rgb(0, 0, 0)' && color !== 'rgb(255, 255, 255)') break;
+                                                el = el.parentElement;
+                                            }
+                                            if (!color) color = window.getComputedStyle(titreElem).color;
+                                            console.log('[Gamification] Couleur du titre détectée (robuste) :', color);
+                                            let r, g, b;
+                                            const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/);
+                                            if (match) {
+                                                r = parseInt(match[1]);
+                                                g = parseInt(match[2]);
+                                                b = parseInt(match[3]);
+                                                if (r > 200 && g < 100 && b < 100) xp = 180;
+                                                else if (r > 200 && g > 100 && b < 100) xp = 140;
+                                                else if (g > 150 && r < 100 && b < 100) xp = 120;
+                                            }
+                                        }
+                                    }
                                     console.log('[Gamification] Nom utilisateur détecté :', userName);
-                                    console.log('[Gamification] Attribution de 100 XP à', userName);
-                                    awardXPToUser(userName, 100);
+                                    console.log('[Gamification] Attribution de', xp, 'XP à', userName);
+                                    awardXPToUser(userName, xp);
                                 } else {
                                     console.log('[Gamification] Condition non remplie : XP non attribuée');
                                 }
@@ -587,7 +636,6 @@
             observer.observe(document.body, { childList: true, subtree: true });
         }
         setupCloturerDetection();
-        updateUI({ xp: 0 }); // Affiche le badge flottant dès le départ
         function waitForUserNameAndInit() {
             let tries = 0;
             function tryInit() {
@@ -610,7 +658,6 @@
                     setTimeout(tryInit, 200);
                 } else {
                     console.warn('[Gamification] Impossible de trouver le nom utilisateur après plusieurs essais.');
-                    updateUI({ xp: 0 });
                 }
             }
             tryInit();
@@ -630,8 +677,6 @@
                         const xp = data && typeof data.xp === 'number' ? data.xp : 0;
                         updateUI({ xp });
                     });
-                } else {
-                    updateUI({ xp: 0 });
                 }
             }
         }, 500);
@@ -667,19 +712,19 @@
             style.id = 'xp-animations';
             style.innerHTML = `
                 @keyframes xpGainAnimation {
-                    0% { 
+                    0% {
                         opacity: 0;
                         transform: translate(-50%, 20px);
                     }
-                    20% { 
+                    20% {
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    80% { 
+                    80% {
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    100% { 
+                    100% {
                         opacity: 0;
                         transform: translate(-50%, -20px);
                     }
@@ -688,4 +733,4 @@
             document.head.appendChild(style);
         }
     }
-})(); 
+})();

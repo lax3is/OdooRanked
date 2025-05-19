@@ -1,5 +1,691 @@
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin <URL_DE_VOTRE_REPO>
-   git push -u origin main
+// ==UserScript==
+// @name         Odoo Gamification System
+// @namespace    http://tampermonkey.net/
+// @version      0.4
+// @description  Add gamification system to Odoo helpdesk with custom rank logos
+// @author       Sair Alexis
+// @match        https://winprovence.odoo.com/*
+// @grant        GM_xmlhttpRequest
+// @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js
+// @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    function loadScript(url, callback){
+        var script = document.createElement("script");
+        script.type = "text/javascript";
+        script.onload = callback;
+        script.src = url;
+        document.head.appendChild(script);
+    }
+
+    loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js", function() {
+        loadScript("https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js", function() {
+            mainGamification();
+        });
+    });
+
+    function mainGamification() {
+        console.log('[Gamification] mainGamification appelée, firebase =', typeof firebase);
+        const firebaseConfig = {
+            apiKey: "AIzaSyB6OFosv9Fg6pMQv0QGxyanuOETtNCw",
+            authDomain: "odooranked.firebaseapp.com",
+            databaseURL: "https://odooranked-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "odooranked",
+            storageBucket: "odooranked.appspot.com",
+            messagingSenderId: "463495344412",
+            appId: "1:463495344412:web:3eace838263aa8124ad49",
+            measurementId: "G-HZHTVQT1H8"
+        };
+        if (firebase.apps.length === 0) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const database = firebase.database();
+
+        // Main ranks and sub-ranks
+        const mainRanks = [
+            { name: "Novice", xpRequired: 0 },
+            { name: "Bronze", xpRequired: 1000 },
+            { name: "Argent", xpRequired: 2500 },
+            { name: "Or", xpRequired: 5000 },
+            { name: "Platine", xpRequired: 10000 },
+            { name: "Diamant", xpRequired: 20000 },
+            { name: "Maître des appels", xpRequired: 35000 },
+            { name: "DIEU DES APPELS", xpRequired: 50000 }
+        ];
+        const subRankLabels = ["IV", "III", "II", "I"];
+        let ranks = [{ name: "Novice", xpRequired: 0 }];
+        for (let i = 1; i < mainRanks.length - 1; i++) { // -1 to exclude DIEU DES APPELS from subranks
+            const prev = mainRanks[i - 1];
+            const curr = mainRanks[i];
+            const step = (curr.xpRequired - prev.xpRequired) / 4;
+            for (let j = 0; j < 4; j++) {
+                ranks.push({
+                    name: `${curr.name} ${subRankLabels[j]}`,
+                    xpRequired: Math.round(prev.xpRequired + step * (j + 1))
+                });
+            }
+        }
+        ranks.push({ name: "DIEU DES APPELS", xpRequired: 50000 });
+
+        // Mapping logos for each main rank
+        const rankLogos = {
+            "Novice": "https://i.imgur.com/ii2aCGm.png",
+            "Bronze": "https://i.imgur.com/JOe5kWu.png",
+            "Argent": "https://i.imgur.com/raOPNIg.png",
+            "Or": "https://i.imgur.com/meGXyT4.png",
+            "Platine": "https://i.imgur.com/7iLbCL8.png",
+            "Diamant": "https://i.imgur.com/dANpcmc.png",
+            "Maître": "https://i.imgur.com/lsKNORI.png",
+            "DIEU": "https://i.imgur.com/jqJIdVW.png"
+        };
+        const rankColors = {
+            "Novice": "#e0e0e0",
+            "Bronze": "#cd7f32",
+            "Argent": "#bfc1c2",
+            "Or": "#e6b800",
+            "Platine": "#7ed6df",
+            "Diamant": "#273c75",
+            "Maître": "#a020f0",
+            "DIEU": "#d90429"
+        };
+        function getRankBaseName(rankName) {
+            if (rankName.startsWith("Maître")) return "Maître";
+            if (rankName.startsWith("DIEU")) return "DIEU";
+            return rankName.split(" ")[0];
+        }
+        function getCurrentRank(xp) {
+            for (let i = ranks.length - 1; i >= 0; i--) {
+                if (xp >= ranks[i].xpRequired) {
+                    return ranks[i];
+                }
+            }
+            return ranks[0];
+        }
+        function getNextRankXp(currentXp) {
+            const currentRank = getCurrentRank(currentXp);
+            const nextRankIndex = ranks.findIndex(rank => rank.xpRequired > currentXp);
+            if (nextRankIndex === -1) return null;
+            return ranks[nextRankIndex].xpRequired - currentXp;
+        }
+        function getContrastYIQ(hexcolor) {
+            hexcolor = hexcolor.replace('#', '');
+            var r = parseInt(hexcolor.substr(0,2),16);
+            var g = parseInt(hexcolor.substr(2,2),16);
+            var b = parseInt(hexcolor.substr(4,2),16);
+            var yiq = ((r*299)+(g*587)+(b*114))/1000;
+            return (yiq >= 128) ? '#222' : '#fff';
+        }
+        function hexToRgba(hex, alpha) {
+            hex = hex.replace('#', '');
+            let r = parseInt(hex.substring(0,2), 16);
+            let g = parseInt(hex.substring(2,4), 16);
+            let b = parseInt(hex.substring(4,6), 16);
+            return `rgba(${r},${g},${b},${alpha})`;
+        }
+        function updateUI(userData) {
+            // Badge flottant : paramètres globaux pour éviter ReferenceError
+            const badgeSize = 80;
+            const logoSize = 60;
+            const stroke = 6;
+            const radius = badgeSize/2 - stroke/2 - 1; // 1px de marge entre logo et cercle
+            const normalizedRadius = radius;
+            const circumference = 2 * Math.PI * normalizedRadius;
+            const currentRank = getCurrentRank(userData.xp);
+            const nextRankXp = getNextRankXp(userData.xp);
+            let progressCircle = 1;
+            if (nextRankXp !== null) {
+                progressCircle = (userData.xp - currentRank.xpRequired) / (nextRankXp + userData.xp - currentRank.xpRequired);
+            }
+            let gamificationUI = document.getElementById('gamification-ui');
+            const baseRank = getRankBaseName(currentRank.name);
+            const logo = rankLogos[baseRank];
+            const color = rankColors[baseRank];
+            const bgColor = color;
+            const textColor = getContrastYIQ(color.replace('#',''));
+            if (!gamificationUI) {
+                gamificationUI = document.createElement('div');
+                gamificationUI.id = 'gamification-ui';
+                document.body.appendChild(gamificationUI);
+            }
+            gamificationUI.style.cssText = `
+                position: fixed;
+                top: 32px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${hexToRgba(bgColor, 0.85)};
+                color: ${textColor};
+                padding: 18px 24px 24px 24px;
+                border-radius: 18px;
+                box-shadow: 0 0 48px 12px ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
+                z-index: 9999;
+                min-width: 220px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                transition: box-shadow 0.3s, width 0.3s, min-width 0.3s, background 0.5s, color 0.5s;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                animation: glowing 2s infinite alternate;
+            `;
+            gamificationUI.style.display = 'none';
+            let controls = `
+                <div style="position:absolute;top:8px;right:8px;display:flex;gap:6px;">
+                    <button id="close-btn" title="Fermer" style="background:none;border:none;font-size:1.2em;cursor:pointer;">×</button>
+                </div>
+            `;
+            let panelContent = `
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:8px;">
+                    <div style="background:rgba(240,240,240,0.75);border-radius:12px;padding:6px;display:flex;align-items:center;justify-content:center;">
+                        <img src="${logo}" alt="Logo Rang" style="width:80px;height:80px;object-fit:contain;box-shadow:0 0 8px 1px ${color}55;border-radius:12px;background:transparent;"/>
+                    </div>
+                    <div style="font-size:1.1em;font-weight:bold;margin-top:2px;color:${textColor};text-shadow:0 0 8px #fff,0 0 16px ${color};">${currentRank.name}</div>
+                </div>
+                ${nextRankXp ? `<div style=\"font-size:0.95em;color:#222;text-align:center;margin-bottom:4px;\">${nextRankXp} XP avant <b>${ranks[ranks.findIndex(r => r.name === currentRank.name)+1]?.name || ""}</b></div>` : ''}
+                <div style="margin:14px 0 0 0;width:100%;">
+                    <div style="background:#e5e5e5;border-radius:8px;height:14px;overflow:hidden;">
+                        <div style="background:#4caf50;height:100%;width:${Math.round(progressCircle*100)}%;transition:width 0.5s;"></div>
+                    </div>
+                </div>
+            `;
+            gamificationUI.innerHTML = controls + panelContent;
+            // --- Notification de level up : une seule fois ---
+            const userName = getCurrentUserName();
+            const storageKey = `gamif_last_rank_${userName}`;
+            const lastRank = localStorage.getItem(storageKey);
+            if (lastRank && lastRank !== currentRank.name) {
+                showRankChangeAnimation(
+                    { name: lastRank },
+                    currentRank,
+                    rankLogos,
+                    rankColors
+                );
+            }
+            localStorage.setItem(storageKey, currentRank.name);
+            gamificationUI.dataset.rank = currentRank.name;
+            document.getElementById('close-btn').onclick = () => {
+                gamificationUI.style.display = "none";
+                openBtn.style.display = 'flex';
+            };
+            // Affichage conditionnel du badge flottant selon l'URL (DYNAMIQUE)
+            const url = window.location.href;
+            const isTicketList = url.includes('model=helpdesk.ticket') && url.includes('view_type=list');
+            const isTicketForm = url.includes('model=helpdesk.ticket') && url.includes('view_type=form');
+            let openBtn = document.getElementById('open-gamification-btn');
+            if (!(isTicketList || isTicketForm)) {
+                if (openBtn) openBtn.style.display = 'none';
+                gamificationUI.style.display = 'none';
+                return;
+            }
+            if (!openBtn) {
+                openBtn = document.createElement('button');
+                openBtn.id = 'open-gamification-btn';
+                openBtn.innerHTML = `
+                  <svg width="${badgeSize}" height="${badgeSize}" style="position:absolute;top:0;left:0;z-index:1;" viewBox="0 0 ${badgeSize} ${badgeSize}">
+                    <defs>
+                      <linearGradient id="xp-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#f953c6"/>
+                        <stop offset="60%" stop-color="#b91d73"/>
+                        <stop offset="100%" stop-color="#6a11cb"/>
+                      </linearGradient>
+                    </defs>
+                    <circle cx="${badgeSize/2}" cy="${badgeSize/2}" r="${normalizedRadius}" stroke="url(#xp-gradient)" stroke-width="${stroke}"
+                      fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - progressCircle * circumference}"
+                      style="transition:stroke-dashoffset 0.5s;" stroke-linecap="round"/>
+                  </svg>
+                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;box-shadow:0 0 0 3px ${color};margin:${(badgeSize-logoSize)/2}px;"/>
+                `;
+                openBtn.title = 'Afficher le score';
+                openBtn.style.cssText = `
+                    position: fixed;
+                    top: 0px;
+                    left: calc(50% - 160px);
+                    transform: translateX(-50%);
+                    z-index: 9998;
+                    font-size: 2em;
+                    background: transparent;
+                    border: none;
+                    border-radius: 50%;
+                    width: ${badgeSize}px;
+                    height: ${badgeSize}px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: none;
+                `;
+                openBtn.onclick = () => {
+                    let gamificationUI = document.getElementById('gamification-ui');
+                    if (gamificationUI) gamificationUI.style.display = '';
+                    openBtn.style.display = 'none';
+                };
+                document.body.appendChild(openBtn);
+            } else {
+                openBtn.innerHTML = `
+                  <svg width="${badgeSize}" height="${badgeSize}" style="position:absolute;top:0;left:0;z-index:1;" viewBox="0 0 ${badgeSize} ${badgeSize}">
+                    <defs>
+                      <linearGradient id="xp-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#f953c6"/>
+                        <stop offset="60%" stop-color="#b91d73"/>
+                        <stop offset="100%" stop-color="#6a11cb"/>
+                      </linearGradient>
+                    </defs>
+                    <circle cx="${badgeSize/2}" cy="${badgeSize/2}" r="${normalizedRadius}" stroke="url(#xp-gradient)" stroke-width="${stroke}"
+                      fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference - progressCircle * circumference}"
+                      style="transition:stroke-dashoffset 0.5s;" stroke-linecap="round"/>
+                  </svg>
+                  <img src="${logo}" alt="Logo Rang" style="width:${logoSize}px;height:${logoSize}px;object-fit:contain;border-radius:50%;background:#fff;position:relative;z-index:2;box-shadow:0 0 0 3px ${color};margin:${(badgeSize-logoSize)/2}px;"/>
+                `;
+                openBtn.style.top = '0px';
+                openBtn.style.left = 'calc(50% - 160px)';
+                openBtn.style.display = 'flex';
+            }
+        }
+        function showRankChangeAnimation(oldRank, newRank, rankLogos, rankColors) {
+            let oldNotif = document.getElementById('rank-change-notif');
+            if (oldNotif) oldNotif.remove();
+            const notif = document.createElement('div');
+            notif.id = 'rank-change-notif';
+            const baseOld = getRankBaseName(oldRank.name);
+            const baseNew = getRankBaseName(newRank.name);
+            const bgColor = rankColors[baseNew];
+            const textColor = getContrastYIQ(bgColor.replace('#',''));
+            const logoOld = rankLogos[baseOld];
+            const logoNew = rankLogos[baseNew];
+            notif.style.cssText = `
+                --glow-color: ${bgColor};
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10001;
+                background: ${hexToRgba(bgColor, 0.85)};
+                color: ${textColor};
+                border-radius: 28px;
+                box-shadow: 0 0 0 0 ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
+                padding: 56px 80px 48px 80px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center;
+                font-size: 2em;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 32px;
+                animation: fadeInNotif 0.3s, glowingNotif 2.2s infinite alternate;
+                border: 3px solid ${bgColor};
+                transition: background 0.5s, color 0.5s, box-shadow 0.5s;
+            `;
+            notif.innerHTML = `
+                <div style="font-size:1.2em;font-weight:bold;margin-bottom:10px;color:${textColor};text-shadow:0 0 8px #fff,0 0 16px ${bgColor};letter-spacing:1px;">🎉 Félicitations !</div>
+                <div style="font-size:1.1em;margin-bottom:18px;color:${textColor};">Passage à un rang supérieur</div>
+                <div style="position:relative;width:100%;height:110px;display:flex;align-items:center;justify-content:center;">
+                    <div id="old-rank" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:1;transition:opacity 0.7s, transform 0.7s cubic-bezier(.4,1.4,.6,1);display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <div style="background:rgba(240,240,240,0.75);border-radius:20px;padding:8px;display:flex;align-items:center;justify-content:center;">
+                            <img src="${logoOld}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;box-shadow:0 0 16px 2px ${bgColor}55;border-radius:16px;background:transparent;"/>
+                        </div>
+                        <span style="color:${textColor};font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${oldRank.name}</span>
+                    </div>
+                    <div id="new-rank" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) translateX(80px) scale(0.5);opacity:0;transition:opacity 0.7s, transform 0.7s cubic-bezier(.4,1.4,.6,1);display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <div style="background:rgba(240,240,240,0.75);border-radius:20px;padding:8px;display:flex;align-items:center;justify-content:center;">
+                            <img src="${logoNew}" alt="Logo Rang" style="width:120px;height:120px;object-fit:contain;box-shadow:0 0 16px 2px ${bgColor}55;border-radius:16px;background:transparent;"/>
+                        </div>
+                        <span style="color:${textColor};font-weight:bold;font-size:1.1em;text-shadow:0 0 8px #fff,0 0 16px ${bgColor};">${newRank.name}</span>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(notif);
+            setTimeout(() => {
+                const oldRankDiv = notif.querySelector('#old-rank');
+                const newRankDiv = notif.querySelector('#new-rank');
+                oldRankDiv.style.opacity = '0';
+                oldRankDiv.style.transform = 'translate(-50%,-50%) translateX(-80px) scale(0.7)';
+                setTimeout(() => {
+                    newRankDiv.style.opacity = '1';
+                    newRankDiv.style.transform = 'translate(-50%,-50%) translateX(0) scale(1.15)';
+                    notif.style.boxShadow = `0 0 120px 40px ${bgColor}, 0 8px 32px rgba(0,0,0,0.18)`;
+                    setTimeout(() => {
+                        newRankDiv.style.transform = 'translate(-50%,-50%) translateX(0) scale(1)';
+                        setTimeout(() => {
+                            notif.style.opacity = '0';
+                            notif.style.transform = 'translate(-50%,-40%) scale(0.95)';
+                            setTimeout(() => {
+                                notif.remove();
+                            }, 400);
+                        }, 1400);
+                    }, 600);
+                }, 700);
+            }, 400);
+        }
+        function addPodiumButton() {
+            if (document.getElementById('podium-btn')) return;
+            // Trouver le bouton Configuration dans la navbar
+            const configBtn = document.querySelector('.o_menu_sections .dropdown-toggle[title="Configuration"], .o_menu_sections [data-section="15"]');
+            if (!configBtn) return setTimeout(() => addPodiumButton(), 1000);
+            // Cloner le bouton Configuration pour garder le style Odoo
+            const btn = configBtn.cloneNode(true);
+            btn.id = 'podium-btn';
+            btn.title = 'Voir le classement';
+            btn.setAttribute('data-section', 'classement');
+            btn.innerHTML = '<span>🏆 Classement</span>';
+            btn.onclick = () => showPodiumPopup();
+            // Insérer juste après Configuration
+            configBtn.parentElement.insertAdjacentElement('afterend', btn);
+        }
+        function showPodiumPopup() {
+            let old = document.getElementById('podium-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('podium-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'podium-bg';
+            bg.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.35);
+                z-index: 9999;
+                animation: fadeInBg 0.3s;
+            `;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'podium-popup';
+            // Fond unique pour tous les thèmes
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
+                border-radius: 18px;
+                box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);
+                z-index: 10000;
+                min-width: 700px;
+                max-width: 99vw;
+                padding: 64px 80px 48px 80px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center;
+                animation: popupIn 0.3s;
+                backdrop-filter: blur(6px);
+                border: 2px solid #26e0ce44;
+            `;
+            popup.innerHTML = `
+                <div style="font-size:2.2em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">🏆 Classement général</div>
+                <div id="leaderboard-loading" style="font-size:1.1em;color:#888;margin-bottom:18px;">Chargement du classement...</div>
+                <div id="leaderboard-content"></div>
+                <button id="close-podium-btn" style="margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;">Fermer</button>
+            `;
+            document.body.appendChild(popup);
+            document.getElementById('close-podium-btn').onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            bg.onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            // Récupère le classement en temps réel depuis Firebase
+            firebase.database().ref('users').once('value').then(snapshot => {
+                const users = snapshot.val() || {};
+                // Transforme en tableau [{name, xp}]
+                const leaderboard = Object.entries(users).map(([name, data]) => ({
+                    name: decodeURIComponent(name),
+                    xp: data.xp || 0,
+                    rank: getCurrentRank(data.xp || 0).name
+                })).sort((a, b) => b.xp - a.xp);
+                const leaderboardHtml = `
+                  <div style="max-height:400px;overflow-y:auto;">
+                    <ol style="padding-left:0;list-style:none;">
+                        ${leaderboard.map((user, i) => {
+                            const base = getRankBaseName(user.rank);
+                            // Glow color selon la place, version discrète
+                            let drop = '';
+                            if (i === 0) drop = 'drop-shadow(0 0 0px #26e0ce88) drop-shadow(0 0 7px #26e0ce88) drop-shadow(0 0 12px #26e0ce44)';
+                            else if (i === 1) drop = 'drop-shadow(0 0 0px #ffd70088) drop-shadow(0 0 6px #ffd70088) drop-shadow(0 0 10px #ffd70044)';
+                            else if (i === 2) drop = 'drop-shadow(0 0 0px #b08d5788) drop-shadow(0 0 5px #b08d5788) drop-shadow(0 0 8px #b08d5744)';
+                            else drop = 'drop-shadow(0 0 3px #8883)';
+                            return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0;font-size:1.15em;\">
+                                <span style=\"font-size:2em;padding-left:24px;display:flex;align-items:center;justify-content:center;\">
+                                    <img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:18px;background:transparent;filter:${drop};\"/>
+                                </span>
+                                <span style=\"font-weight:bold;color:${rankColors[base]};min-width:120px;display:inline-block;\">${i+1}. ${user.name}</span>
+                                <span style=\"color:#888;\">${user.rank} - ${user.xp} XP</span>
+                            </li>`;
+                        }).join('')}
+                    </ol>
+                  </div>
+                `;
+                const loadingElem = document.getElementById('leaderboard-loading');
+                if (loadingElem) loadingElem.style.display = 'none';
+                document.getElementById('leaderboard-content').innerHTML = leaderboardHtml;
+            }).catch(err => {
+                const loadingElem = document.getElementById('leaderboard-loading');
+                if (loadingElem) loadingElem.textContent = 'Erreur lors du chargement du classement.';
+            });
+        }
+        function getCurrentUserName() {
+            // Cherche dans la systray tous les spans visibles
+            const systray = document.querySelector('.o_menu_systray, .o_user_menu, .o_user_menu_name, .oe_topbar_name');
+            if (systray) {
+                // Prend le texte le plus long (souvent le nom complet)
+                const spans = systray.querySelectorAll('span');
+                let best = '';
+                spans.forEach(s => {
+                    const txt = s.textContent.trim();
+                    if (txt.length > best.length) best = txt;
+                });
+                if (best.length > 0) return best;
+            }
+            // Fallback : cherche dans toute la barre du haut
+            const allSpans = document.querySelectorAll('span');
+            let best = '';
+            allSpans.forEach(s => {
+                const txt = s.textContent.trim();
+                if (txt.length > best.length) best = txt;
+            });
+            if (best.length > 0) return best;
+            return 'Utilisateur inconnu';
+        }
+        function awardXPToUser(userName, amount) {
+            const userRef = firebase.database().ref('users/' + encodeURIComponent(userName));
+            userRef.once('value').then(snapshot => {
+                const data = snapshot.val();
+                const currentXp = data && typeof data.xp === 'number' ? data.xp : 0;
+                const newXp = currentXp + amount;
+                userRef.set({ xp: newXp })
+                    .then(() => {
+                        showXPGainNotification(amount);
+                        updateUI({ xp: newXp });
+                    })
+                    .catch(err => {
+                        console.error('[Gamification] Erreur lors de l\'écriture Firebase :', err);
+                        alert('Erreur Firebase : ' + err.message);
+                    });
+            }).catch(err => {
+                console.error('[Gamification] Erreur lors de la lecture Firebase :', err);
+                alert('Erreur lecture Firebase : ' + err.message);
+            });
+        }
+        function showXPGainNotification(amount) {
+            let notification = document.getElementById('xp-gain-notification');
+            if (notification) {
+                notification.remove();
+            }
+            
+            notification = document.createElement('div');
+            notification.id = 'xp-gain-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 90px;
+                left: calc(50% - 160px);
+                transform: translateX(-50%);
+                background: rgba(38, 224, 206, 0.9);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: bold;
+                font-size: 1.1em;
+                z-index: 9999;
+                box-shadow: 0 0 20px rgba(38, 224, 206, 0.5);
+                animation: xpGainAnimation 2s forwards;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            `;
+            
+            notification.innerHTML = `
+                <span style="font-size: 1.2em;">✨</span>
+                <span>+${amount} XP</span>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Supprime la notification après l'animation
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+        function setupCloturerDetection() {
+            function addListeners() {
+                document.querySelectorAll('button, a').forEach(btn => {
+                    if (btn.dataset.gamifCloturer) return;
+                    if (btn.textContent && btn.textContent.trim().toLowerCase().includes('clôturer')) {
+                        btn.dataset.gamifCloturer = '1';
+                        btn.addEventListener('click', function() {
+                            console.log('[Gamification] Clic sur bouton Clôturer détecté');
+                            setTimeout(() => {
+                                // Vérifie si le bouton est désactivé ou si le ticket est passé à l'état clôturé
+                                const isDisabled = btn.disabled || btn.classList.contains('disabled') || btn.getAttribute('disabled') !== null;
+                                console.log('[Gamification] Etat du bouton Clôturer :', isDisabled ? 'désactivé' : 'actif');
+                                // Cherche un badge ou un indicateur d'état
+                                const etatCloture = document.querySelector('.o_arrow_button_current[data-value="4"], .badge.bg-danger, .badge.bg-success, .badge.bg-primary');
+                                if (etatCloture) {
+                                    console.log('[Gamification] Texte du badge trouvé :', etatCloture.textContent.trim());
+                                } else {
+                                    console.log('[Gamification] Aucun badge d\'état trouvé');
+                                }
+                                if (
+                                    isDisabled ||
+                                    (etatCloture && /cl[ôo]tur[ée]|résolu/i.test(etatCloture.textContent))
+                                ) {
+                                    const userName = getCurrentUserName();
+                                    console.log('[Gamification] Nom utilisateur détecté :', userName);
+                                    console.log('[Gamification] Attribution de 100 XP à', userName);
+                                    awardXPToUser(userName, 100);
+                                } else {
+                                    console.log('[Gamification] Condition non remplie : XP non attribuée');
+                                }
+                            }, 1200);
+                        });
+                    }
+                });
+            }
+            // Premier scan
+            addListeners();
+            // Observe le DOM pour les nouveaux boutons
+            const observer = new MutationObserver(addListeners);
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+        setupCloturerDetection();
+        updateUI({ xp: 0 }); // Affiche le badge flottant dès le départ
+        function waitForUserNameAndInit() {
+            let tries = 0;
+            function tryInit() {
+                const userName = getCurrentUserName();
+                if (userName && userName !== 'Utilisateur inconnu') {
+                    console.log('[Gamification] Utilisateur détecté au chargement :', userName);
+                    console.log('[Gamification] Début de la lecture XP Firebase pour', userName);
+                    if (typeof firebase === 'undefined') {
+                        console.error('[Gamification] Firebase N\'EST PAS chargé !');
+                        return;
+                    }
+                    firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+                        const data = snapshot.val();
+                        const xp = data && typeof data.xp === 'number' ? data.xp : 0;
+                        console.log('[Gamification] Lecture Firebase pour', userName, ':', data, '=> XP utilisée :', xp);
+                        updateUI({ xp });
+                    });
+                } else if (tries < 20) { // essaie pendant 4 secondes max
+                    tries++;
+                    setTimeout(tryInit, 200);
+                } else {
+                    console.warn('[Gamification] Impossible de trouver le nom utilisateur après plusieurs essais.');
+                    updateUI({ xp: 0 });
+                }
+            }
+            tryInit();
+        }
+        waitForUserNameAndInit();
+        addPodiumButton();
+        // --- Ajout : observer de changement d'URL pour SPA ---
+        let lastUrl = window.location.href;
+        setInterval(() => {
+            if (window.location.href !== lastUrl) {
+                lastUrl = window.location.href;
+                // Recharge l'XP utilisateur pour updateUI
+                const userName = getCurrentUserName();
+                if (userName && userName !== 'Utilisateur inconnu') {
+                    firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+                        const data = snapshot.val();
+                        const xp = data && typeof data.xp === 'number' ? data.xp : 0;
+                        updateUI({ xp });
+                    });
+                } else {
+                    updateUI({ xp: 0 });
+                }
+            }
+        }, 500);
+        if (!document.getElementById('podium-animations')) {
+            const style = document.createElement('style');
+            style.id = 'podium-animations';
+            style.innerHTML = `
+                @keyframes popupIn { from { opacity:0; transform:translate(-50%,-60%);} to { opacity:1; transform:translate(-50%,-50%);} }
+                @keyframes fadeInBg { from { opacity:0; } to { opacity:1; } }
+            `;
+            document.head.appendChild(style);
+        }
+        if (!document.getElementById('rank-animations')) {
+            const style = document.createElement('style');
+            style.id = 'rank-animations';
+            style.innerHTML = `
+                @keyframes fadeInNotif { from { opacity:0; } to { opacity:1; } }
+                @keyframes glowing {
+                    0% { box-shadow: 0 0 8px 2px #fff, 0 0 32px 8px var(--glow-color); }
+                    50% { box-shadow: 0 0 32px 16px var(--glow-color), 0 0 64px 24px #fff; }
+                    100% { box-shadow: 0 0 8px 2px #fff, 0 0 32px 8px var(--glow-color); }
+                }
+                @keyframes glowingNotif {
+                    0% { box-shadow: 0 0 0 0 var(--glow-color), 0 8px 32px rgba(0,0,0,0.18); }
+                    40% { box-shadow: 0 0 64px 24px var(--glow-color), 0 8px 32px rgba(0,0,0,0.18); }
+                    100% { box-shadow: 0 0 0 0 var(--glow-color), 0 8px 32px rgba(0,0,0,0.18); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        if (!document.getElementById('xp-animations')) {
+            const style = document.createElement('style');
+            style.id = 'xp-animations';
+            style.innerHTML = `
+                @keyframes xpGainAnimation {
+                    0% { 
+                        opacity: 0;
+                        transform: translate(-50%, 20px);
+                    }
+                    20% { 
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                    80% { 
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                    100% { 
+                        opacity: 0;
+                        transform: translate(-50%, -20px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+})(); 

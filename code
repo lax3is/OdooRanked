@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.0
+// @version      0.1.1
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -182,7 +182,7 @@
             gamificationUI.style.display = 'none';
             let controls = `
                 <div style="position:absolute;top:8px;right:8px;display:flex;gap:6px;">
-                    <button id="close-btn" title="Fermer" style="background:none;border:none;font-size:1.2em;cursor:pointer;">×</button>
+                    <button id="close-btn" title="Fermer" style="background:none;border:none;font-size:2em;cursor:pointer;color:#ff3b3b;">×</button>
                 </div>
             `;
             let panelContent = `
@@ -379,9 +379,292 @@
             btn.title = 'Voir le classement';
             btn.setAttribute('data-section', 'classement');
             btn.innerHTML = '<span>🏆 Classement</span>';
-            btn.onclick = () => showPodiumPopup();
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                showClassementMenu(btn);
+            };
             // Insérer juste après Configuration
             configBtn.parentElement.insertAdjacentElement('afterend', btn);
+        }
+        function showClassementMenu(anchorBtn) {
+            // Supprime tout menu existant
+            let oldMenu = document.getElementById('classement-dropdown-menu');
+            if (oldMenu) oldMenu.remove();
+            // Crée le menu déroulant
+            const menu = document.createElement('div');
+            menu.id = 'classement-dropdown-menu';
+            const menuWidth = 240;
+            menu.style.cssText = `
+                position: fixed;
+                min-width: ${menuWidth}px;
+                max-width: 98vw;
+                background: #23272f;
+                color: #fff;
+                border-radius: 14px;
+                box-shadow: 0 8px 32px 0 #26e0ce55, 0 2px 8px #0008;
+                z-index: 10010;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                padding: 0.5em 0;
+                border: none;
+                transition: transform 0.18s cubic-bezier(.4,1.4,.6,1);
+                transform: scale(0.98);
+            `;
+            menu.innerHTML = `
+                <div style="padding:12px 24px;cursor:pointer;font-size:1.1em;transition:background 0.2s;" onmouseover="this.style.background='#2226'" onmouseout="this.style.background='none'" id="menu-classement-general">🏆 Classement général</div>
+                <div style="padding:12px 24px;cursor:pointer;font-size:1.1em;transition:background 0.2s;" onmouseover="this.style.background='#2226'" onmouseout="this.style.background='none'" id="menu-stats-personnelles">📊 Stats personnelles</div>
+                <div style="padding:12px 24px;cursor:pointer;font-size:1.1em;transition:background 0.2s;" onmouseover="this.style.background='#2226'" onmouseout="this.style.background='none'" id="menu-stats-autres">👥 Stats des autres utilisateurs</div>
+            `;
+            document.body.appendChild(menu);
+            // Positionne le menu centré sous le bouton
+            const rect = anchorBtn.getBoundingClientRect();
+            menu.style.left = (rect.left + rect.width/2 - menuWidth/2 + window.scrollX) + 'px';
+            menu.style.top = (rect.bottom + window.scrollY + 8) + 'px';
+            // Petit effet scale à l'ouverture
+            setTimeout(() => {
+                menu.style.transform = 'scale(1)';
+            }, 10);
+            // Ferme le menu si on clique ailleurs
+            setTimeout(() => {
+                document.addEventListener('click', closeMenuOnClick, { once: true });
+            }, 10);
+            function closeMenuOnClick(e) {
+                if (!menu.contains(e.target)) menu.remove();
+            }
+            // Actions des choix
+            menu.querySelector('#menu-classement-general').onclick = () => {
+                menu.remove();
+                showPodiumPopup();
+            };
+            menu.querySelector('#menu-stats-personnelles').onclick = () => {
+                menu.remove();
+                showStatsPopup('me');
+            };
+            menu.querySelector('#menu-stats-autres').onclick = () => {
+                menu.remove();
+                showStatsPopup('others');
+            };
+            // Ajout effet glowing sur hover pour chaque option du menu
+            const menuOptions = menu.querySelectorAll('div[id^="menu-"]');
+            menuOptions.forEach(opt => {
+                opt.addEventListener('mouseover', function() {
+                    this.style.background = '#23272f';
+                    this.style.boxShadow = '0 0 12px 2px #26e0ce, 0 2px 8px #0006';
+                    this.style.color = '#26e0ce';
+                });
+                opt.addEventListener('mouseout', function() {
+                    this.style.background = 'none';
+                    this.style.boxShadow = 'none';
+                    this.style.color = '#fff';
+                });
+            });
+        }
+        function showStatsPopup(mode) {
+            // Supprime tout popup existant
+            let old = document.getElementById('stats-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('stats-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'stats-bg';
+            bg.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.35);
+                z-index: 9999;
+                animation: fadeInBg 0.3s;
+            `;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'stats-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
+                border-radius: 18px;
+                box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);
+                z-index: 10000;
+                min-width: 700px;
+                max-width: 99vw;
+                padding: 64px 80px 48px 80px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center;
+                animation: popupIn 0.3s;
+                backdrop-filter: blur(6px);
+                border: 2px solid #26e0ce44;
+            `;
+            let title = mode === 'me' ? '📊 Mes statistiques' : '👥 Statistiques des autres utilisateurs';
+            popup.innerHTML = `
+                <div style="font-size:2.2em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">${title}</div>
+                <div id="stats-content" style="margin-bottom:18px;font-size:1.1em;color:#aaa;">Chargement des stats...</div>
+                <button id="close-stats-btn" style="margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;">Fermer</button>
+            `;
+            document.body.appendChild(popup);
+            document.getElementById('close-stats-btn').onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            bg.onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            // --- Affichage des stats ---
+            const statsContent = document.getElementById('stats-content');
+            if (mode === 'me') {
+                // Stats personnelles
+                const userName = getCurrentUserName();
+                firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+                    const data = snapshot.val();
+                    const xp = data && typeof data.xp === 'number' ? data.xp : 0;
+                    const rank = getCurrentRank(xp).name;
+                    let html = `
+                        <div style="font-size:1.3em;margin-bottom:12px;"><b>${userName}</b></div>
+                        <div style="font-size:1.1em;margin-bottom:8px;">Rang : <b style='color:#26e0ce;'>${rank}</b></div>
+                        <div style="font-size:1.1em;margin-bottom:8px;">XP : <b style='color:#4caf50;'>${xp}</b></div>
+                    `;
+                    // Tableau des clotures détaillées avec filtre
+                    const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
+                    html += `<div style='margin-top:18px;font-size:1.08em;'><b>Appels clôturés (détail)</b></div>`;
+                    html += `<div style='margin-bottom:10px;'>
+                        <label for='cloture-filter-me' style='margin-right:8px;'>Filtrer par :</label>
+                        <select id='cloture-filter-me' style='padding:4px 10px;border-radius:6px;'>
+                            <option value='jour'>Jour</option>
+                            <option value='semaine'>Semaine</option>
+                            <option value='mois'>Mois</option>
+                            <option value='annee'>Année</option>
+                            <option value='tout'>Tout</option>
+                        </select>
+                    </div>`;
+                    html += `<div id='cloture-table-me'></div>`;
+                    statsContent.innerHTML = html;
+                    function filterLogsMe(period) {
+                        const now = new Date();
+                        let filtered = logs;
+                        if (period === 'jour') {
+                            const today = now.toISOString().slice(0,10);
+                            filtered = logs.filter(l => l.date === today);
+                        } else if (period === 'semaine') {
+                            const weekStart = new Date(now);
+                            weekStart.setDate(now.getDate() - now.getDay());
+                            const weekEnd = new Date(weekStart);
+                            weekEnd.setDate(weekStart.getDate() + 6);
+                            filtered = logs.filter(l => {
+                                const d = new Date(l.date);
+                                return d >= weekStart && d <= weekEnd;
+                            });
+                        } else if (period === 'mois') {
+                            const ym = now.toISOString().slice(0,7);
+                            filtered = logs.filter(l => l.date && l.date.startsWith(ym));
+                        } else if (period === 'annee') {
+                            const y = now.getFullYear().toString();
+                            filtered = logs.filter(l => l.date && l.date.startsWith(y));
+                        }
+                        return filtered.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+                    }
+                    function renderTableMe(period) {
+                        const filtered = filterLogsMe(period);
+                        let table = '';
+                        if (filtered.length > 0) {
+                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                <thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th style='padding:6px 14px;'>Heure</th><th style='padding:6px 14px;'>Type</th></tr></thead>
+                                <tbody>` +
+                                filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</td></tr>`).join('') +
+                                `</tbody></table>`;
+                        } else {
+                            table = `<div style='margin-top:8px;color:#aaa;'>Aucune clôture enregistrée pour cette période.</div>`;
+                        }
+                        document.getElementById('cloture-table-me').innerHTML = table;
+                    }
+                    renderTableMe('jour');
+                    document.getElementById('cloture-filter-me').onchange = function() {
+                        renderTableMe(this.value);
+                    };
+                }).catch(err => {
+                    statsContent.innerHTML = 'Erreur lors du chargement de vos stats.';
+                });
+            } else {
+                // Stats des autres utilisateurs
+                firebase.database().ref('users').once('value').then(snapshot => {
+                    const users = snapshot.val() || {};
+                    const currentUser = getCurrentUserName();
+                    let html = '';
+                    let found = false;
+                    const userList = [];
+                    Object.entries(users).forEach(([name, data], idx) => {
+                        if (decodeURIComponent(name) === currentUser) return;
+                        userList.push({ name, data, idx });
+                        html += `<div style='font-size:1.15em;margin:18px 0 6px 0;'><b>${decodeURIComponent(name)}</b></div>`;
+                        html += `<div style='margin-bottom:10px;'>
+                            <label for='cloture-filter-others-${idx}' style='margin-right:8px;'>Filtrer par :</label>
+                            <select id='cloture-filter-others-${idx}' style='padding:4px 10px;border-radius:6px;'>
+                                <option value='jour'>Jour</option>
+                                <option value='semaine'>Semaine</option>
+                                <option value='mois'>Mois</option>
+                                <option value='annee'>Année</option>
+                                <option value='tout'>Tout</option>
+                            </select>
+                        </div>`;
+                        html += `<div id='cloture-table-others-${idx}'></div>`;
+                        found = found || (data && data.clotures_log && Object.keys(data.clotures_log).length > 0);
+                    });
+                    if (!found) html = '<div style="color:#aaa;">Aucune clôture enregistrée pour les autres utilisateurs.</div>';
+                    statsContent.innerHTML = html;
+                    // Après injection du HTML, attache les listeners et fait le rendu
+                    userList.forEach(({ name, data, idx }) => {
+                        const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
+                        function filterLogsOthers(period) {
+                            const now = new Date();
+                            let filtered = logs;
+                            if (period === 'jour') {
+                                const today = now.toISOString().slice(0,10);
+                                filtered = logs.filter(l => l.date === today);
+                            } else if (period === 'semaine') {
+                                const weekStart = new Date(now);
+                                weekStart.setDate(now.getDate() - now.getDay());
+                                const weekEnd = new Date(weekStart);
+                                weekEnd.setDate(weekStart.getDate() + 6);
+                                filtered = logs.filter(l => {
+                                    const d = new Date(l.date);
+                                    return d >= weekStart && d <= weekEnd;
+                                });
+                            } else if (period === 'mois') {
+                                const ym = now.toISOString().slice(0,7);
+                                filtered = logs.filter(l => l.date && l.date.startsWith(ym));
+                            } else if (period === 'annee') {
+                                const y = now.getFullYear().toString();
+                                filtered = logs.filter(l => l.date && l.date.startsWith(y));
+                            }
+                            return filtered.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+                        }
+                        function renderTableOthers(period) {
+                            const filtered = filterLogsOthers(period);
+                            let table = '';
+                            if (filtered.length > 0) {
+                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                    <thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th style='padding:6px 14px;'>Heure</th><th style='padding:6px 14px;'>Type</th></tr></thead>
+                                    <tbody>` +
+                                    filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</td></tr>`).join('') +
+                                    `</tbody></table>`;
+                            } else {
+                                table = `<div style='margin-top:8px;color:#aaa;'>Aucune clôture enregistrée pour cette période.</div>`;
+                            }
+                            const tableDiv = document.getElementById('cloture-table-others-' + idx);
+                            if (tableDiv) tableDiv.innerHTML = table;
+                        }
+                        renderTableOthers('jour');
+                        const select = document.getElementById('cloture-filter-others-' + idx);
+                        if (select) {
+                            select.onchange = function() {
+                                renderTableOthers(this.value);
+                            };
+                        }
+                    });
+                }).catch(err => {
+                    statsContent.innerHTML = 'Erreur lors du chargement des stats.';
+                });
+            }
         }
         function showPodiumPopup() {
             let old = document.getElementById('podium-popup');
@@ -487,7 +770,7 @@
                 });
                 if (best.length > 0) return best;
             }
-            // Fallback : cherche dans toute la barre du haut
+            // Fallback : cherche dans toute la barre du haut
             const allSpans = document.querySelectorAll('span');
             let best = '';
             allSpans.forEach(s => {
@@ -497,13 +780,14 @@
             if (best.length > 0) return best;
             return 'Utilisateur inconnu';
         }
-        function awardXPToUser(userName, amount) {
+        function awardXPToUser(userName, amount, typeCloture = 'normal') {
             const userRef = firebase.database().ref('users/' + encodeURIComponent(userName));
             userRef.once('value').then(snapshot => {
                 const data = snapshot.val();
                 const currentXp = data && typeof data.xp === 'number' ? data.xp : 0;
                 const newXp = currentXp + amount;
-                userRef.set({ xp: newXp })
+                // Enregistrement du XP
+                userRef.update({ xp: newXp })
                     .then(() => {
                         showXPGainNotification(amount);
                         updateUI({ xp: newXp });
@@ -512,6 +796,15 @@
                         console.error('[Gamification] Erreur lors de l\'écriture Firebase :', err);
                         alert('Erreur Firebase : ' + err.message);
                     });
+                // Enregistrement de la cloture détaillée (compteur par jour/type)
+                const now = new Date();
+                const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+                const timeStr = now.toTimeString().slice(0,5); // HH:mm
+                const clotureRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures/' + dateStr + '/' + typeCloture);
+                clotureRef.transaction(current => (current || 0) + 1);
+                // Enregistrement du log détaillé (date + heure + type)
+                const logRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log');
+                logRef.push({ date: dateStr, time: timeStr, type: typeCloture });
             }).catch(err => {
                 console.error('[Gamification] Erreur lors de la lecture Firebase :', err);
                 alert('Erreur lecture Firebase : ' + err.message);
@@ -522,11 +815,10 @@
             if (notification) {
                 notification.remove();
             }
-
+            
             notification = document.createElement('div');
             notification.id = 'xp-gain-notification';
-            notification.style.cssText = `
-                position: fixed;
+            notification.style.cssText = `                position: fixed;
                 top: 90px;
                 left: calc(50% - 160px);
                 transform: translateX(-50%);
@@ -544,14 +836,14 @@
                 align-items: center;
                 gap: 8px;
             `;
-
+            
             notification.innerHTML = `
                 <span style="font-size: 1.2em;">✨</span>
                 <span>+${amount} XP</span>
             `;
-
+            
             document.body.appendChild(notification);
-
+            
             // Supprime la notification après l'animation
             setTimeout(() => {
                 notification.remove();
@@ -712,19 +1004,19 @@
             style.id = 'xp-animations';
             style.innerHTML = `
                 @keyframes xpGainAnimation {
-                    0% {
+                    0% { 
                         opacity: 0;
                         transform: translate(-50%, 20px);
                     }
-                    20% {
+                    20% { 
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    80% {
+                    80% { 
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    100% {
+                    100% { 
                         opacity: 0;
                         transform: translate(-50%, -20px);
                     }
@@ -733,4 +1025,4 @@
             document.head.appendChild(style);
         }
     }
-})();
+})(); 

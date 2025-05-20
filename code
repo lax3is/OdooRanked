@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -43,6 +43,24 @@
             firebase.initializeApp(firebaseConfig);
         }
         const database = firebase.database();
+
+        // Fonction utilitaire pour formater et colorer les chiffres dans les tableaux de stats
+        function formatStatNumber(val, type) {
+            let color = '#3498db'; // Normal (bleu)
+            if (type === 'important') color = '#27ae60'; // vert
+            if (type === 'urgent') color = '#ff9800'; // orange
+            if (type === 'bloquant') color = '#e74c3c'; // rouge
+            const style = `font-size:1.25em;font-weight:bold;${val > 0 ? `color:${color};` : 'color:#eee;'}text-align:center;`;
+            return `<span style='${style}'>${val}</span>`;
+        }
+
+        // Fonction utilitaire pour colorer le type d'appel
+        function formatTypeLabel(type) {
+            if (type === 'important') return `<span style='color:#27ae60;font-weight:bold;'>Important</span>`;
+            if (type === 'urgent') return `<span style='color:#ff9800;font-weight:bold;'>Urgent</span>`;
+            if (type === 'bloquant') return `<span style='color:#e74c3c;font-weight:bold;'>Bloquant</span>`;
+            return `<span style='color:#3498db;font-weight:bold;'>Normal</span>`;
+        }
 
         // Main ranks and sub-ranks
         const mainRanks = [
@@ -524,7 +542,6 @@
                         <div style="font-size:1.1em;margin-bottom:8px;">Rang : <b style='color:#26e0ce;'>${rank}</b></div>
                         <div style="font-size:1.1em;margin-bottom:8px;">XP : <b style='color:#4caf50;'>${xp}</b></div>
                     `;
-                    // Tableau des clotures détaillées avec filtre
                     const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
                     html += `<div style='margin-top:18px;font-size:1.08em;'><b>Appels clôturés (détail)</b></div>`;
                     html += `<div style='margin-bottom:10px;'>
@@ -536,46 +553,222 @@
                             <option value='annee'>Année</option>
                             <option value='tout'>Tout</option>
                         </select>
+                        <span id='period-select-me'></span>
                     </div>`;
                     html += `<div id='cloture-table-me'></div>`;
                     statsContent.innerHTML = html;
-                    function filterLogsMe(period) {
+
+                    // Helper pour grouper les logs par date
+                    function groupBy(arr, key) {
+                        return arr.reduce((acc, obj) => {
+                            const k = obj[key];
+                            if (!acc[k]) acc[k] = [];
+                            acc[k].push(obj);
+                            return acc;
+                        }, {});
+                    }
+                    // Helper pour compter par type
+                    function countTypes(logs) {
+                        const types = { important: 0, urgent: 0, bloquant: 0, normal: 0 };
+                        logs.forEach(l => { if (types[l.type] !== undefined) types[l.type]++; });
+                        return types;
+                    }
+                    // Helper pour obtenir tous les mois/années présents
+                    function getAllMonthsYears(logs) {
+                        const months = new Set();
+                        const years = new Set();
+                        logs.forEach(l => {
+                            if (l.date) {
+                                years.add(l.date.slice(0,4));
+                                months.add(l.date.slice(0,7));
+                            }
+                        });
+                        return { months: Array.from(months).sort().reverse(), years: Array.from(years).sort().reverse() };
+                    }
+                    function renderTableMe(period, periodValue = null) {
                         const now = new Date();
                         let filtered = logs;
+                        let table = '';
+                        let periodLabel = '';
+                        let periodSelector = '';
                         if (period === 'jour') {
                             const today = now.toISOString().slice(0,10);
                             filtered = logs.filter(l => l.date === today);
+                            periodLabel = `Aujourd'hui (${today})`;
                         } else if (period === 'semaine') {
+                            // Semaine courante (lundi à dimanche)
                             const weekStart = new Date(now);
-                            weekStart.setDate(now.getDate() - now.getDay());
-                            const weekEnd = new Date(weekStart);
-                            weekEnd.setDate(weekStart.getDate() + 6);
-                            filtered = logs.filter(l => {
-                                const d = new Date(l.date);
-                                return d >= weekStart && d <= weekEnd;
+                            weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
+                            const weekDates = [];
+                            for (let i=0; i<7; i++) {
+                                const d = new Date(weekStart);
+                                d.setDate(weekStart.getDate() + i);
+                                weekDates.push(d.toISOString().slice(0,10));
+                            }
+                            periodLabel = `Semaine du ${weekDates[0]} au ${weekDates[6]}`;
+                            // Ajoute un bouton drilldown sur la période
+                            periodLabel = `<button id='drilldown-semaine-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Semaine du ${weekDates[0]} au ${weekDates[6]}</button>`;
+                            setTimeout(() => {
+                                const allLogs = logs.filter(l => weekDates.includes(l.date));
+                                document.getElementById('drilldown-semaine-btn').onclick = function() {
+                                    showPeriodDetailPopup(`Semaine du ${weekDates[0]} au ${weekDates[6]}`, weekDates, allLogs);
+                                };
+                            }, 0);
+                            // Affichage par jour
+                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                <thead><tr style='background:#222;'>
+                                    <th style='padding:6px 14px;'>Date</th>
+                                    <th>Normal</th>
+                                    <th>Important</th>
+                                    <th>Urgent</th>
+                                    <th>Bloquant</th>
+                                    <th>Total</th>
+                                </tr></thead><tbody>`;
+                            weekDates.forEach(date => {
+                                const dayLogs = logs.filter(l => l.date === date);
+                                const types = countTypes(dayLogs);
+                                const total = dayLogs.length;
+                                const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
+                                const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${date}' data-logs='${encodeURIComponent(JSON.stringify(dayLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedDayName} ${date}</button></td>` +
+                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
+                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
+                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
+                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
+                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
                             });
+                            table += `</tbody></table></div>`;
+                            filtered = logs.filter(l => weekDates.includes(l.date));
                         } else if (period === 'mois') {
-                            const ym = now.toISOString().slice(0,7);
-                            filtered = logs.filter(l => l.date && l.date.startsWith(ym));
+                            // Sélecteur de mois
+                            const { months } = getAllMonthsYears(logs);
+                            let selectedMonth = periodValue || now.toISOString().slice(0,7);
+                            if (!months.includes(selectedMonth)) selectedMonth = months[0] || selectedMonth;
+                            periodSelector = `<select id='mois-select-me' style='margin-left:8px;padding:4px 10px;border-radius:6px;'>` +
+                                months.map(m => `<option value='${m}' ${m===selectedMonth?'selected':''}>${m}</option>`).join('') +
+                                `</select>`;
+                            periodLabel = `Mois : ${selectedMonth}`;
+                            // Ajoute un bouton drilldown sur la période
+                            periodLabel = `<button id='drilldown-mois-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Mois : ${selectedMonth}</button>`;
+                            setTimeout(() => {
+                                const days = [];
+                                for (let d=1; d<=new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate(); d++) days.push(selectedMonth + '-' + (d<10?'0':'')+d);
+                                const allLogs = logs.filter(l => l.date && l.date.startsWith(selectedMonth));
+                                document.getElementById('drilldown-mois-btn').onclick = function() {
+                                    showPeriodDetailPopup(`Mois : ${selectedMonth}`, days, allLogs);
+                                };
+                            }, 0);
+                            // Affichage par jour du mois
+                            const daysInMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate();
+                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                <thead><tr style='background:#222;'>
+                                    <th style='padding:6px 14px;'>Date</th>
+                                    <th>Normal</th>
+                                    <th>Important</th>
+                                    <th>Urgent</th>
+                                    <th>Bloquant</th>
+                                    <th>Total</th>
+                                </tr></thead><tbody>`;
+                            for (let d=1; d<=daysInMonth; d++) {
+                                const day = selectedMonth + '-' + (d<10?'0':'')+d;
+                                const dayLogs = logs.filter(l => l.date === day);
+                                const types = countTypes(dayLogs);
+                                const total = dayLogs.length;
+                                const dayName = new Date(day).toLocaleDateString('fr-FR', { weekday: 'long' });
+                                const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${day}' data-logs='${encodeURIComponent(JSON.stringify(dayLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedDayName} ${day}</button></td>` +
+                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
+                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
+                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
+                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
+                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
+                            }
+                            table += `</tbody></table></div>`;
+                            filtered = logs.filter(l => l.date && l.date.startsWith(selectedMonth));
                         } else if (period === 'annee') {
-                            const y = now.getFullYear().toString();
-                            filtered = logs.filter(l => l.date && l.date.startsWith(y));
+                            // Sélecteur d'année
+                            const { years } = getAllMonthsYears(logs);
+                            let selectedYear = periodValue || now.getFullYear().toString();
+                            if (!years.includes(selectedYear)) selectedYear = years[0] || selectedYear;
+                            periodSelector = `<select id='annee-select-me' style='margin-left:8px;padding:4px 10px;border-radius:6px;'>` +
+                                years.map(y => `<option value='${y}' ${y===selectedYear?'selected':''}>${y}</option>`).join('') +
+                                `</select>`;
+                            periodLabel = `Année : ${selectedYear}`;
+                            // Ajoute un bouton drilldown sur la période
+                            periodLabel = `<button id='drilldown-annee-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Année : ${selectedYear}</button>`;
+                            setTimeout(() => {
+                                const months = [];
+                                for (let m=1; m<=12; m++) months.push(selectedYear + '-' + (m<10?'0':'')+m);
+                                const allLogs = logs.filter(l => l.date && l.date.startsWith(selectedYear));
+                                const btn = document.getElementById('drilldown-annee-btn');
+                                if (btn) {
+                                    btn.onclick = function() {
+                                        showPeriodDetailPopup(`Année : ${selectedYear}`, months, allLogs);
+                                    };
+                                }
+                            }, 0);
+                            // Affichage par mois de l'année
+                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                <thead><tr style='background:#222;'>
+                                    <th style='padding:6px 14px;'>Mois</th>
+                                    <th>Normal</th>
+                                    <th>Important</th>
+                                    <th>Urgent</th>
+                                    <th>Bloquant</th>
+                                    <th>Total</th>
+                                </tr></thead><tbody>`;
+                            for (let m=1; m<=12; m++) {
+                                const month = selectedYear + '-' + (m<10?'0':'')+m;
+                                const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
+                                const types = countTypes(monthLogs);
+                                const total = monthLogs.length;
+                                const monthName = new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long' });
+                                const capitalizedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${month}' data-logs='${encodeURIComponent(JSON.stringify(monthLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedMonthName} ${month}</button></td>` +
+                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
+                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
+                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
+                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
+                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
+                            }
+                            table += `</tbody></table></div>`;
+                            filtered = logs.filter(l => l.date && l.date.startsWith(selectedYear));
+                        } else if (period === 'tout') {
+                            periodLabel = 'Toutes les clôtures';
                         }
-                        return filtered.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-                    }
-                    function renderTableMe(period) {
-                        const filtered = filterLogsMe(period);
-                        let table = '';
-                        if (filtered.length > 0) {
-                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                <thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th style='padding:6px 14px;'>Heure</th><th style='padding:6px 14px;'>Type</th></tr></thead>
-                                <tbody>` +
-                                filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</td></tr>`).join('') +
-                                `</tbody></table>`;
-                        } else {
-                            table = `<div style='margin-top:8px;color:#aaa;'>Aucune clôture enregistrée pour cette période.</div>`;
+                        // Totaux
+                        const typesTotal = countTypes(filtered);
+                        const totalAll = filtered.length;
+                        let totalHtml = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.25em;'>${totalAll}</span>`;
+                        totalHtml += ` | Normal : ${formatStatNumber(typesTotal.normal, 'normal')}`;
+                        totalHtml += ` | Important : ${formatStatNumber(typesTotal.important, 'important')}`;
+                        totalHtml += ` | Urgent : ${formatStatNumber(typesTotal.urgent, 'urgent')}`;
+                        totalHtml += ` | Bloquant : ${formatStatNumber(typesTotal.bloquant, 'bloquant')}</div>`;
+                        document.getElementById('period-select-me').innerHTML = periodSelector;
+                        let callListHtml = '';
+                        if (period === 'jour' && filtered.length > 0) {
+                            // Liste des appels du jour, triée par heure décroissante
+                            const sorted = filtered.slice().sort((a, b) => (b.time || '').localeCompare(a.time || ''));
+                            callListHtml = `<div style='margin:18px 0 0 0;'>
+                                <div style='font-size:1.1em;font-weight:bold;margin-bottom:6px;'>Détail des appels clôturés aujourd\'hui :</div>
+                                <table style='width:100%;border-collapse:collapse;'>
+                                    <thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead>
+                                    <tbody>
+                                        ${sorted.map(log => `<tr><td style='padding:6px 14px;font-size:1.1em;'>${log.time || ''}</td><td style='padding:6px 14px;font-size:1.1em;'>${formatTypeLabel(log.type || '')}</td></tr>`).join('')}
+                                    </tbody>
+                                </table>
+                            </div>`;
                         }
-                        document.getElementById('cloture-table-me').innerHTML = table;
+                        document.getElementById('cloture-table-me').innerHTML = `<div style='margin-bottom:6px;'>${periodLabel}</div>${totalHtml}${table}${callListHtml}`;
+                        // Listeners pour select mois/année
+                        if (period === 'mois') {
+                            const moisSelect = document.getElementById('mois-select-me');
+                            if (moisSelect) moisSelect.onchange = function() { renderTableMe('mois', this.value); };
+                        }
+                        if (period === 'annee') {
+                            const anneeSelect = document.getElementById('annee-select-me');
+                            if (anneeSelect) anneeSelect.onchange = function() { renderTableMe('annee', this.value); };
+                        }
                     }
                     renderTableMe('jour');
                     document.getElementById('cloture-filter-me').onchange = function() {
@@ -642,11 +835,17 @@
                             const filtered = filterLogsOthers(period);
                             let table = '';
                             if (filtered.length > 0) {
-                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                    <thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th style='padding:6px 14px;'>Heure</th><th style='padding:6px 14px;'>Type</th></tr></thead>
-                                    <tbody>` +
-                                    filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</td></tr>`).join('') +
-                                    `</tbody></table>`;
+                                table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
+                                    <thead><tr style='background:#222;'>
+                                        <th style='padding:6px 14px;'>Date</th>
+                                        <th>Normal</th>
+                                        <th>Important</th>
+                                        <th>Urgent</th>
+                                        <th>Bloquant</th>
+                                        <th>Total</th>
+                                    </tr></thead><tbody>` +
+                                    filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`).join('') +
+                                    `</tbody></table></div>`;
                             } else {
                                 table = `<div style='margin-top:8px;color:#aaa;'>Aucune clôture enregistrée pour cette période.</div>`;
                             }
@@ -876,15 +1075,15 @@
                                     // Détection du nombre d'étoiles (Priorité)
                                     let xp = 100;
                                     let nbEtoiles = 0;
+                                    let typeCloture = 'normal';
                                     const prioriteRow = document.querySelector('.o_form_view .o_field_widget.o_field_priority, .o_form_view .o_priority, .o_form_view [name="priority"]');
                                     if (prioriteRow) {
-                                        // Cherche les étoiles pleines (fa-star, o_rating_star_full, etc.)
                                         nbEtoiles = prioriteRow.querySelectorAll('.fa-star, .o_rating_star_full, .o_priority_star.o_full').length;
-                                        if (nbEtoiles === 3) xp = 180;
-                                        else if (nbEtoiles === 2) xp = 140;
-                                        else if (nbEtoiles === 1) xp = 120;
-                                        else xp = 100;
-                                        console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp);
+                                        if (nbEtoiles === 1) { xp = 180; typeCloture = 'important'; }
+                                        else if (nbEtoiles === 2) { xp = 140; typeCloture = 'urgent'; }
+                                        else if (nbEtoiles === 3) { xp = 120; typeCloture = 'bloquant'; }
+                                        else { xp = 100; typeCloture = 'normal'; }
+                                        console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp, ', type =', typeCloture);
                                     } else {
                                         // Fallback couleur si jamais la priorité n'est pas trouvée
                                         let titreElem = document.querySelector('.o_form_view input[name="name"], .o_form_view .o_field_widget.o_field_char, .o_form_view h1, .o_form_view .o_form_label');
@@ -904,15 +1103,15 @@
                                                 r = parseInt(match[1]);
                                                 g = parseInt(match[2]);
                                                 b = parseInt(match[3]);
-                                                if (r > 200 && g < 100 && b < 100) xp = 180;
-                                                else if (r > 200 && g > 100 && b < 100) xp = 140;
-                                                else if (g > 150 && r < 100 && b < 100) xp = 120;
+                                                if (r > 200 && g < 100 && b < 100) { xp = 180; typeCloture = 'important'; }
+                                                else if (r > 200 && g > 100 && b < 100) { xp = 140; typeCloture = 'urgent'; }
+                                                else if (g > 150 && r < 100 && b < 100) { xp = 120; typeCloture = 'bloquant'; }
                                             }
                                         }
                                     }
                                     console.log('[Gamification] Nom utilisateur détecté :', userName);
-                                    console.log('[Gamification] Attribution de', xp, 'XP à', userName);
-                                    awardXPToUser(userName, xp);
+                                    console.log('[Gamification] Attribution de', xp, 'XP à', userName, 'Type:', typeCloture);
+                                    awardXPToUser(userName, xp, typeCloture);
                                 } else {
                                     console.log('[Gamification] Condition non remplie : XP non attribuée');
                                 }
@@ -1023,6 +1222,149 @@
                 }
             `;
             document.head.appendChild(style);
+        }
+        // Ajoute la fonction pour afficher le popup central de détail d'un jour
+        function showDayDetailPopup(date, logs) {
+            // Supprime tout popup existant
+            let old = document.getElementById('day-detail-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('day-detail-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'day-detail-bg';
+            bg.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.35);
+                z-index: 9999;
+                animation: fadeInBg 0.3s;
+            `;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'day-detail-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
+                border-radius: 18px;
+                box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);
+                z-index: 10000;
+                min-width: 400px;
+                max-width: 99vw;
+                padding: 48px 48px 32px 48px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center;
+                animation: popupIn 0.3s;
+                backdrop-filter: blur(6px);
+                border: 2px solid #26e0ce44;
+            `;
+            const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
+            const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+            let html = `<div style="font-size:1.5em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">Détail des appels du ${capitalizedDayName} ${date}</div>`;
+            if (logs.length === 0) {
+                html += `<div style='color:#aaa;'>Aucun appel clôturé ce jour.</div>`;
+            } else {
+                html += `<table style='width:100%;border-collapse:collapse;'>
+                    <thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead>
+                    <tbody>
+                        ${logs.sort((a, b) => (b.time || '').localeCompare(a.time || '')).map(log => `<tr><td style='padding:6px 14px;font-size:1.1em;'>${log.time || ''}</td><td style='padding:6px 14px;font-size:1.1em;'>${formatTypeLabel(log.type || '')}</td></tr>`).join('')}
+                    </tbody>
+                </table>`;
+            }
+            html += `<button id='close-day-detail-btn' style='margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;'>Fermer</button>`;
+            popup.innerHTML = html;
+            document.body.appendChild(popup);
+            document.getElementById('close-day-detail-btn').onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            bg.onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+        }
+        window.showDayDetailPopup = showDayDetailPopup;
+        // Ajoute la fonction pour afficher le popup central de détail d'une période (semaine/mois)
+        function showPeriodDetailPopup(periodLabel, days, logs) {
+            // Supprime tout popup existant
+            let old = document.getElementById('period-detail-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('period-detail-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'period-detail-bg';
+            bg.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.35);
+                z-index: 9999;
+                animation: fadeInBg 0.3s;
+            `;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'period-detail-popup';
+            popup.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(34,40,49,0.93);
+                color: #f3f6fa;
+                border-radius: 18px;
+                box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);
+                z-index: 10000;
+                min-width: 400px;
+                max-width: 99vw;
+                padding: 48px 48px 32px 48px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                text-align: center;
+                animation: popupIn 0.3s;
+                backdrop-filter: blur(6px);
+                border: 2px solid #26e0ce44;
+            `;
+            let html = `<div style="font-size:1.5em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">Détail : ${periodLabel}</div>`;
+            html += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;'>
+                <thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Date</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th>Total</th></tr></thead><tbody>`;
+            days.forEach(date => {
+                const dayLogs = logs.filter(l => l.date === date);
+                const types = { normal: 0, important: 0, urgent: 0, bloquant: 0 };
+                dayLogs.forEach(l => { if (types[l.type] !== undefined) types[l.type]++; });
+                const total = dayLogs.length;
+                const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
+                const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+                html += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn-popup' data-date='${date}' data-logs='${encodeURIComponent(JSON.stringify(dayLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedDayName} ${date}</button></td>` +
+                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
+                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
+                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
+                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
+                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+            html += `<button id='close-period-detail-btn' style='margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;'>Fermer</button>`;
+            popup.innerHTML = html;
+            document.body.appendChild(popup);
+            document.getElementById('close-period-detail-btn').onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            bg.onclick = () => {
+                popup.remove();
+                bg.remove();
+            };
+            // Ajoute event sur chaque jour du popup
+            setTimeout(() => {
+                document.querySelectorAll('.show-day-detail-btn-popup').forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const date = this.getAttribute('data-date');
+                        const logs = JSON.parse(decodeURIComponent(this.getAttribute('data-logs')));
+                        showDayDetailPopup(date, logs);
+                    });
+                });
+            }, 0);
         }
     }
 })(); 

@@ -8,6 +8,8 @@
 // @grant        GM_xmlhttpRequest
 // @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js
+// @downloadURL  https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
+// @updateURL    https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
 // ==/UserScript==
 
 (function() {
@@ -388,21 +390,31 @@
         }
         function addPodiumButton() {
             if (document.getElementById('podium-btn')) return;
-            // Trouver le bouton Configuration dans la navbar
-            const configBtn = document.querySelector('.o_menu_sections .dropdown-toggle[title="Configuration"], .o_menu_sections [data-section="15"]');
-            if (!configBtn) return setTimeout(() => addPodiumButton(), 1000);
-            // Cloner le bouton Configuration pour garder le style Odoo
-            const btn = configBtn.cloneNode(true);
-            btn.id = 'podium-btn';
-            btn.title = 'Voir le classement';
-            btn.setAttribute('data-section', 'classement');
-            btn.innerHTML = '<span>🏆 Classement</span>';
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                showClassementMenu(btn);
-            };
-            // Insérer juste après Configuration
-            configBtn.parentElement.insertAdjacentElement('afterend', btn);
+            
+            function tryAddButton() {
+                // Chercher le bouton Analyse dans la navbar
+                const analyseBtn = document.querySelector('.o_menu_sections .dropdown-toggle[title="Analyse"]');
+                if (!analyseBtn) {
+                    setTimeout(tryAddButton, 1000);
+                    return;
+                }
+
+                // Cloner le bouton Analyse pour garder le style Odoo
+                const btn = analyseBtn.cloneNode(true);
+                btn.id = 'podium-btn';
+                btn.title = 'Voir le classement';
+                btn.setAttribute('data-section', 'classement');
+                btn.innerHTML = '<span>🏆 Classement</span>';
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    showClassementMenu(btn);
+                };
+
+                // Insérer juste après Analyse
+                analyseBtn.parentElement.insertAdjacentElement('afterend', btn);
+            }
+
+            tryAddButton();
         }
         function showClassementMenu(anchorBtn) {
             // Supprime tout menu existant
@@ -531,72 +543,226 @@
             // --- Affichage des stats ---
             const statsContent = document.getElementById('stats-content');
             if (mode === 'me') {
-                // Stats personnelles
+                // Stats personnelles - refonte
                 const userName = getCurrentUserName();
                 firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
                     const data = snapshot.val();
                     const xp = data && typeof data.xp === 'number' ? data.xp : 0;
                     const rank = getCurrentRank(xp).name;
-                    let html = `
-                        <div style="font-size:1.3em;margin-bottom:12px;"><b>${userName}</b></div>
-                        <div style="font-size:1.1em;margin-bottom:8px;">Rang : <b style='color:#26e0ce;'>${rank}</b></div>
-                        <div style="font-size:1.1em;margin-bottom:8px;">XP : <b style='color:#4caf50;'>${xp}</b></div>
-                    `;
                     const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
-                    html += `<div style='margin-top:18px;font-size:1.08em;'><b>Appels clôturés (détail)</b></div>`;
-                    html += `<div style='margin-bottom:10px;'>
-                        <label for='cloture-filter-me' style='margin-right:8px;'>Filtrer par :</label>
-                        <select id='cloture-filter-me' style='padding:4px 10px;border-radius:6px;'>
-                            <option value='jour'>Jour</option>
-                            <option value='semaine'>Semaine</option>
-                            <option value='mois'>Mois</option>
-                            <option value='annee'>Année</option>
-                            <option value='tout'>Tout</option>
-                        </select>
-                        <span id='period-select-me'></span>
-                    </div>`;
-                    html += `<div id='cloture-table-me'></div>`;
+                    let filter = 'jour';
+                    let html = `<div style='font-size:1.3em;margin-bottom:12px;'><b>${userName}</b> <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:#26e0ce;'>${rank}</span> — <span style='color:#4caf50;'>${xp} XP</span></span></div>`;
+                    html += `<div style='margin-bottom:18px;'><label for='cloture-filter-me' style='margin-right:8px;'>Filtrer par :</label><select id='cloture-filter-me' style='padding:4px 10px;border-radius:6px;'>` +
+                        `<option value='jour'>Jour</option>`+
+                        `<option value='semaine'>Semaine</option>`+
+                        `<option value='mois'>Mois</option>`+
+                        `<option value='annee'>Année</option>`+
+                        `<option value='tout'>Tout</option>`+
+                        `</select></div>`;
+                    html += `<div id='me-summary'></div><div id='me-table'></div>`;
                     statsContent.innerHTML = html;
-
-                    // Helper pour grouper les logs par date
-                    function groupBy(arr, key) {
-                        return arr.reduce((acc, obj) => {
-                            const k = obj[key];
-                            if (!acc[k]) acc[k] = [];
-                            acc[k].push(obj);
-                            return acc;
-                        }, {});
-                    }
-                    // Helper pour compter par type
                     function countTypes(logs) {
-                        const types = { important: 0, urgent: 0, bloquant: 0, normal: 0 };
+                        const types = { normal: 0, important: 0, urgent: 0, bloquant: 0 };
                         logs.forEach(l => { if (types[l.type] !== undefined) types[l.type]++; });
                         return types;
                     }
-                    // Helper pour obtenir tous les mois/années présents
-                    function getAllMonthsYears(logs) {
-                        const months = new Set();
-                        const years = new Set();
-                        logs.forEach(l => {
-                            if (l.date) {
-                                years.add(l.date.slice(0,4));
-                                months.add(l.date.slice(0,7));
-                            }
-                        });
-                        return { months: Array.from(months).sort().reverse(), years: Array.from(years).sort().reverse() };
-                    }
-                    function renderTableMe(period, periodValue = null) {
-                        const now = new Date();
-                        let filtered = logs;
+                    function renderTable(period) {
+                        let summary = '';
                         let table = '';
-                        let periodLabel = '';
-                        let periodSelector = '';
+                        if (period === 'jour') {
+                            const now = new Date();
+                            const today = now.toISOString().slice(0,10);
+                            const filtered = logs.filter(l => l.date === today);
+                            const types = countTypes(filtered);
+                            const total = filtered.length;
+                            summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
+                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                            table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead><tbody>`;
+                            filtered.sort((a, b) => (b.time||'').localeCompare(a.time||''));
+                            filtered.forEach(log => {
+                                table += `<tr><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                            });
+                            table += `</tbody></table>`;
+                            document.getElementById('me-summary').innerHTML = summary;
+                            document.getElementById('me-table').innerHTML = table;
+                        } else if (period === 'semaine' || period === 'mois') {
+                            let days = [];
+                            const now = new Date();
+                            if (period === 'semaine') {
+                                const weekStart = new Date(now);
+                                weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
+                                for (let i=0; i<7; i++) {
+                                    const d = new Date(weekStart);
+                                    d.setDate(weekStart.getDate() + i);
+                                    days.push(d.toISOString().slice(0,10));
+                                }
+                            } else if (period === 'mois') {
+                                const ym = now.toISOString().slice(0,7);
+                                const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+                                for (let d=1; d<=daysInMonth; d++) {
+                                    days.push(ym + '-' + (d<10?'0':'')+d);
+                                }
+                            }
+                            summary = `<div style='margin-bottom:8px;'><b>Appels par ${period === 'semaine' ? 'jour de la semaine' : 'jour du mois'} :</b></div>`;
+                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                            table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
+                            days.forEach((date, dIdx) => {
+                                const dayLogs = logs.filter(l => l.date === date);
+                                const types = countTypes(dayLogs);
+                                const total = dayLogs.length;
+                                const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
+                                table += `<tr style='background:${dIdx%2?'#23272f':'#1a1d22'};'>`+
+                                    `<td style='padding:6px 14px;'>${dayName} ${date}</td>`+
+                                    `<td style='font-weight:bold;color:#4caf50;'>${total}</td>`+
+                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>`+
+                                    `<td>${formatStatNumber(types.important, 'important')}</td>`+
+                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>`+
+                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>`+
+                                    `<td><button class='show-day-detail-me-btn' data-date='${date}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;'>▼</button></td>`+
+                                `</tr>`;
+                                table += `<tr id='me-detail-${date}' style='display:none;background:#23272f;'><td colspan='7'></td></tr>`;
+                            });
+                            table += `</tbody></table>`;
+                            document.getElementById('me-summary').innerHTML = summary;
+                            document.getElementById('me-table').innerHTML = table;
+                        } else if (period === 'annee') {
+                            const now = new Date();
+                            const year = now.getFullYear();
+                            let months = [];
+                            for (let m=1; m<=12; m++) {
+                                const month = year + '-' + (m<10?'0':'')+m;
+                                months.push(month);
+                            }
+                            summary = `<div style='margin-bottom:8px;'><b>Appels par mois :</b></div>`;
+                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                            table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Mois</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
+                            months.forEach((month, mIdx) => {
+                                const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
+                                const types = countTypes(monthLogs);
+                                const total = monthLogs.length;
+                                const monthName = new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long' });
+                                table += `<tr style='background:${mIdx%2?'#23272f':'#1a1d22'};'>`+
+                                    `<td style='padding:6px 14px;'>${monthName} ${month}</td>`+
+                                    `<td style='font-weight:bold;color:#4caf50;'>${total}</td>`+
+                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>`+
+                                    `<td>${formatStatNumber(types.important, 'important')}</td>`+
+                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>`+
+                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>`+
+                                    `<td><button class='show-month-detail-me-btn' data-month='${month}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;'>▼</button></td>`+
+                                `</tr>`;
+                                table += `<tr id='me-detail-${month}' style='display:none;background:#23272f;'><td colspan='7'></td></tr>`;
+                            });
+                            table += `</tbody></table>`;
+                            document.getElementById('me-summary').innerHTML = summary;
+                            document.getElementById('me-table').innerHTML = table;
+                        } else {
+                            const types = countTypes(logs);
+                            const total = logs.length;
+                            summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
+                            table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                            table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Heure</th><th>Type</th></tr></thead><tbody>`;
+                            logs.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||''))); 
+                            logs.forEach(log => {
+                                table += `<tr><td style='padding:6px 14px;'>${log.date || ''}</td><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                            });
+                            table += `</tbody></table>`;
+                            document.getElementById('me-summary').innerHTML = summary;
+                            document.getElementById('me-table').innerHTML = table;
+                        }
+                        // Listeners pour dérouler les détails jour/mois
+                        document.querySelectorAll('.show-day-detail-me-btn').forEach(btn => {
+                            btn.onclick = function() {
+                                const date = this.getAttribute('data-date');
+                                const detailRow = document.getElementById('me-detail-' + date);
+                                if (!detailRow) return;
+                                if (detailRow.style.display === 'none') {
+                                    // Affiche le détail
+                                    const dayLogs = logs.filter(l => l.date === date);
+                                    let detailHtml = `<table style='width:100%;border-collapse:collapse;'><thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead><tbody>`;
+                                    dayLogs.sort((a, b) => (b.time||'').localeCompare(a.time||''));
+                                    dayLogs.forEach(log => {
+                                        detailHtml += `<tr><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                    });
+                                    detailHtml += `</tbody></table>`;
+                                    detailRow.children[0].innerHTML = detailHtml;
+                                    detailRow.style.display = '';
+                                } else {
+                                    detailRow.style.display = 'none';
+                                }
+                            };
+                        });
+                        document.querySelectorAll('.show-month-detail-me-btn').forEach(btn => {
+                            btn.onclick = function() {
+                                const month = this.getAttribute('data-month');
+                                const detailRow = document.getElementById('me-detail-' + month);
+                                if (!detailRow) return;
+                                if (detailRow.style.display === 'none') {
+                                    // Affiche le détail
+                                    const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
+                                    let detailHtml = `<table style='width:100%;border-collapse:collapse;'><thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Date</th><th>Heure</th><th>Type</th></tr></thead><tbody>`;
+                                    monthLogs.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
+                                    monthLogs.forEach(log => {
+                                        detailHtml += `<tr><td style='padding:6px 14px;'>${log.date || ''}</td><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                    });
+                                    detailHtml += `</tbody></table>`;
+                                    detailRow.children[0].innerHTML = detailHtml;
+                                    detailRow.style.display = '';
+                                } else {
+                                    detailRow.style.display = 'none';
+                                }
+                            };
+                        });
+                    }
+                    renderTable(filter);
+                    document.getElementById('cloture-filter-me').onchange = function() {
+                        renderTable(this.value);
+                    };
+                }).catch(err => {
+                    statsContent.innerHTML = 'Erreur lors du chargement de vos stats.';
+                });
+            } else {
+                // Stats des autres utilisateurs - refonte
+                firebase.database().ref('users').once('value').then(snapshot => {
+                    const users = snapshot.val() || {};
+                    const currentUser = getCurrentUserName();
+                    // Prépare la liste des utilisateurs (hors soi-même)
+                    const userList = Object.entries(users)
+                        .filter(([name, data]) => decodeURIComponent(name) !== currentUser)
+                        .map(([name, data]) => ({ name: decodeURIComponent(name), data }));
+                    // Filtre global
+                    let filter = 'jour';
+                    // Génère le sélecteur global
+                    let filterHtml = `<div style='margin-bottom:18px;'><label for='cloture-filter-global' style='margin-right:8px;'>Filtrer par :</label><select id='cloture-filter-global' style='padding:4px 10px;border-radius:6px;'>` +
+                        `<option value='jour'>Jour</option>`+
+                        `<option value='semaine'>Semaine</option>`+
+                        `<option value='mois'>Mois</option>`+
+                        `<option value='annee'>Année</option>`+
+                        `<option value='tout'>Tout</option>`+
+                        `</select></div>`;
+                    // Conteneur scrollable
+                    let html = filterHtml + `<div id='users-stats-list' style='max-height:420px;overflow-y:auto;text-align:left;'>`;
+                    userList.forEach(({ name, data }, idx) => {
+                        const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
+                        // Ajout du rang et de l'XP
+                        const xp = data && typeof data.xp === 'number' ? data.xp : 0;
+                        const rank = getCurrentRank(xp).name;
+                        html += `<div class='user-stats-block' style='margin-bottom:32px;padding:18px 18px 12px 18px;background:#23272f;border-radius:12px;'>`;
+                        html += `<div style='font-size:1.18em;font-weight:bold;margin-bottom:8px;color:#26e0ce;display:flex;align-items:center;cursor:pointer;' class='user-toggle' data-idx='${idx}'>`;
+                        html += `<span style='margin-right:8px;transition:transform 0.2s;' id='arrow-${idx}'>▼</span>${name} <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:#26e0ce;'>${rank}</span> — <span style='color:#4caf50;'>${xp} XP</span></span>`;
+                        html += `</div>`;
+                        html += `<div id='user-summary-${idx}'></div>`;
+                        html += `<div id='user-table-${idx}' style='display:none;'></div>`;
+                        html += `</div>`;
+                    });
+                    html += `</div>`;
+                    statsContent.innerHTML = html;
+                    // Fonction de filtrage et rendu
+                    function filterLogs(logs, period) {
+                        const now = new Date();
                         if (period === 'jour') {
                             const today = now.toISOString().slice(0,10);
-                            filtered = logs.filter(l => l.date === today);
-                            periodLabel = `Aujourd'hui (${today})`;
+                            return logs.filter(l => l.date === today);
                         } else if (period === 'semaine') {
-                            // Semaine courante (lundi à dimanche)
                             const weekStart = new Date(now);
                             weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
                             const weekDates = [];
@@ -605,260 +771,199 @@
                                 d.setDate(weekStart.getDate() + i);
                                 weekDates.push(d.toISOString().slice(0,10));
                             }
-                            periodLabel = `Semaine du ${weekDates[0]} au ${weekDates[6]}`;
-                            // Ajoute un bouton drilldown sur la période
-                            periodLabel = `<button id='drilldown-semaine-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Semaine du ${weekDates[0]} au ${weekDates[6]}</button>`;
-                            setTimeout(() => {
-                                const allLogs = logs.filter(l => weekDates.includes(l.date));
-                                document.getElementById('drilldown-semaine-btn').onclick = function() {
-                                    showPeriodDetailPopup(`Semaine du ${weekDates[0]} au ${weekDates[6]}`, weekDates, allLogs);
-                                };
-                            }, 0);
-                            // Affichage par jour
-                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                <thead><tr style='background:#222;'>
-                                    <th style='padding:6px 14px;'>Date</th>
-                                    <th>Normal</th>
-                                    <th>Important</th>
-                                    <th>Urgent</th>
-                                    <th>Bloquant</th>
-                                    <th>Total</th>
-                                </tr></thead><tbody>`;
-                            weekDates.forEach(date => {
-                                const dayLogs = logs.filter(l => l.date === date);
-                                const types = countTypes(dayLogs);
-                                const total = dayLogs.length;
-                                const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
-                                const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${date}' data-logs='${encodeURIComponent(JSON.stringify(dayLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedDayName} ${date}</button></td>` +
-                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
-                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
-                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
-                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
-                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
-                            });
-                            table += `</tbody></table></div>`;
-                            filtered = logs.filter(l => weekDates.includes(l.date));
+                            return logs.filter(l => weekDates.includes(l.date));
                         } else if (period === 'mois') {
-                            // Sélecteur de mois
-                            const { months } = getAllMonthsYears(logs);
-                            let selectedMonth = periodValue || now.toISOString().slice(0,7);
-                            if (!months.includes(selectedMonth)) selectedMonth = months[0] || selectedMonth;
-                            periodSelector = `<select id='mois-select-me' style='margin-left:8px;padding:4px 10px;border-radius:6px;'>` +
-                                months.map(m => `<option value='${m}' ${m===selectedMonth?'selected':''}>${m}</option>`).join('') +
-                                `</select>`;
-                            periodLabel = `Mois : ${selectedMonth}`;
-                            // Ajoute un bouton drilldown sur la période
-                            periodLabel = `<button id='drilldown-mois-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Mois : ${selectedMonth}</button>`;
-                            setTimeout(() => {
-                                const days = [];
-                                for (let d=1; d<=new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate(); d++) days.push(selectedMonth + '-' + (d<10?'0':'')+d);
-                                const allLogs = logs.filter(l => l.date && l.date.startsWith(selectedMonth));
-                                document.getElementById('drilldown-mois-btn').onclick = function() {
-                                    showPeriodDetailPopup(`Mois : ${selectedMonth}`, days, allLogs);
-                                };
-                            }, 0);
-                            // Affichage par jour du mois
-                            const daysInMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate();
-                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                <thead><tr style='background:#222;'>
-                                    <th style='padding:6px 14px;'>Date</th>
-                                    <th>Normal</th>
-                                    <th>Important</th>
-                                    <th>Urgent</th>
-                                    <th>Bloquant</th>
-                                    <th>Total</th>
-                                </tr></thead><tbody>`;
-                            for (let d=1; d<=daysInMonth; d++) {
-                                const day = selectedMonth + '-' + (d<10?'0':'')+d;
-                                const dayLogs = logs.filter(l => l.date === day);
-                                const types = countTypes(dayLogs);
-                                const total = dayLogs.length;
-                                const dayName = new Date(day).toLocaleDateString('fr-FR', { weekday: 'long' });
-                                const capitalizedDayName = dayName.charAt(0).toUpperCase() + dayName.slice(1);
-                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${day}' data-logs='${encodeURIComponent(JSON.stringify(dayLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedDayName} ${day}</button></td>` +
-                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
-                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
-                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
-                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
-                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
-                            }
-                            table += `</tbody></table></div>`;
-                            filtered = logs.filter(l => l.date && l.date.startsWith(selectedMonth));
+                            const ym = now.toISOString().slice(0,7);
+                            return logs.filter(l => l.date && l.date.startsWith(ym));
                         } else if (period === 'annee') {
-                            // Sélecteur d'année
-                            const { years } = getAllMonthsYears(logs);
-                            let selectedYear = periodValue || now.getFullYear().toString();
-                            if (!years.includes(selectedYear)) selectedYear = years[0] || selectedYear;
-                            periodSelector = `<select id='annee-select-me' style='margin-left:8px;padding:4px 10px;border-radius:6px;'>` +
-                                years.map(y => `<option value='${y}' ${y===selectedYear?'selected':''}>${y}</option>`).join('') +
-                                `</select>`;
-                            periodLabel = `Année : ${selectedYear}`;
-                            // Ajoute un bouton drilldown sur la période
-                            periodLabel = `<button id='drilldown-annee-btn' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;text-decoration:underline;'>Année : ${selectedYear}</button>`;
-                            setTimeout(() => {
-                                const months = [];
-                                for (let m=1; m<=12; m++) months.push(selectedYear + '-' + (m<10?'0':'')+m);
-                                const allLogs = logs.filter(l => l.date && l.date.startsWith(selectedYear));
-                                const btn = document.getElementById('drilldown-annee-btn');
-                                if (btn) {
-                                    btn.onclick = function() {
-                                        showPeriodDetailPopup(`Année : ${selectedYear}`, months, allLogs);
-                                    };
-                                }
-                            }, 0);
-                            // Affichage par mois de l'année
-                            table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                <thead><tr style='background:#222;'>
-                                    <th style='padding:6px 14px;'>Mois</th>
-                                    <th>Normal</th>
-                                    <th>Important</th>
-                                    <th>Urgent</th>
-                                    <th>Bloquant</th>
-                                    <th>Total</th>
-                                </tr></thead><tbody>`;
-                            for (let m=1; m<=12; m++) {
-                                const month = selectedYear + '-' + (m<10?'0':'')+m;
-                                const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
-                                const types = countTypes(monthLogs);
-                                const total = monthLogs.length;
-                                const monthName = new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long' });
-                                const capitalizedMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-                                table += `<tr><td style='padding:6px 14px;'><button class='show-day-detail-btn' data-date='${month}' data-logs='${encodeURIComponent(JSON.stringify(monthLogs))}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1em;text-decoration:underline;'>${capitalizedMonthName} ${month}</button></td>` +
-                                    `<td>${formatStatNumber(types.normal, 'normal')}</td>` +
-                                    `<td>${formatStatNumber(types.important, 'important')}</td>` +
-                                    `<td>${formatStatNumber(types.urgent, 'urgent')}</td>` +
-                                    `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>` +
-                                    `<td><span style='font-size:1.25em;font-weight:bold;color:#fff;'>${total}</span></td></tr>`;
-                            }
-                            table += `</tbody></table></div>`;
-                            filtered = logs.filter(l => l.date && l.date.startsWith(selectedYear));
-                        } else if (period === 'tout') {
-                            periodLabel = 'Toutes les clôtures';
+                            const y = now.getFullYear().toString();
+                            return logs.filter(l => l.date && l.date.startsWith(y));
                         }
-                        // Totaux
-                        const typesTotal = countTypes(filtered);
-                        const totalAll = filtered.length;
-                        let totalHtml = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.25em;'>${totalAll}</span>`;
-                        totalHtml += ` | Normal : ${formatStatNumber(typesTotal.normal, 'normal')}`;
-                        totalHtml += ` | Important : ${formatStatNumber(typesTotal.important, 'important')}`;
-                        totalHtml += ` | Urgent : ${formatStatNumber(typesTotal.urgent, 'urgent')}`;
-                        totalHtml += ` | Bloquant : ${formatStatNumber(typesTotal.bloquant, 'bloquant')}</div>`;
-                        document.getElementById('period-select-me').innerHTML = periodSelector;
-                        let callListHtml = '';
-                        if (period === 'jour' && filtered.length > 0) {
-                            // Liste des appels du jour, triée par heure décroissante
-                            const sorted = filtered.slice().sort((a, b) => (b.time || '').localeCompare(a.time || ''));
-                            callListHtml = `<div style='margin:18px 0 0 0;'>
-                                <div style='font-size:1.1em;font-weight:bold;margin-bottom:6px;'>Détail des appels clôturés aujourd\'hui :</div>
-                                <table style='width:100%;border-collapse:collapse;'>
-                                    <thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead>
-                                    <tbody>
-                                        ${sorted.map(log => `<tr><td style='padding:6px 14px;font-size:1.1em;'>${log.time || ''}</td><td style='padding:6px 14px;font-size:1.1em;'>${formatTypeLabel(log.type || '')}</td></tr>`).join('')}
-                                    </tbody>
-                                </table>
-                            </div>`;
-                        }
-                        document.getElementById('cloture-table-me').innerHTML = `<div style='margin-bottom:6px;'>${periodLabel}</div>${totalHtml}${table}${callListHtml}`;
-                        // Listeners pour select mois/année
-                        if (period === 'mois') {
-                            const moisSelect = document.getElementById('mois-select-me');
-                            if (moisSelect) moisSelect.onchange = function() { renderTableMe('mois', this.value); };
-                        }
-                        if (period === 'annee') {
-                            const anneeSelect = document.getElementById('annee-select-me');
-                            if (anneeSelect) anneeSelect.onchange = function() { renderTableMe('annee', this.value); };
-                        }
+                        return logs;
                     }
-                    renderTableMe('jour');
-                    document.getElementById('cloture-filter-me').onchange = function() {
-                        renderTableMe(this.value);
-                    };
-                }).catch(err => {
-                    statsContent.innerHTML = 'Erreur lors du chargement de vos stats.';
-                });
-            } else {
-                // Stats des autres utilisateurs
-                firebase.database().ref('users').once('value').then(snapshot => {
-                    const users = snapshot.val() || {};
-                    const currentUser = getCurrentUserName();
-                    let html = '';
-                    let found = false;
-                    const userList = [];
-                    Object.entries(users).forEach(([name, data], idx) => {
-                        if (decodeURIComponent(name) === currentUser) return;
-                        userList.push({ name, data, idx });
-                        html += `<div style='font-size:1.15em;margin:18px 0 6px 0;'><b>${decodeURIComponent(name)}</b></div>`;
-                        html += `<div style='margin-bottom:10px;'>
-                            <label for='cloture-filter-others-${idx}' style='margin-right:8px;'>Filtrer par :</label>
-                            <select id='cloture-filter-others-${idx}' style='padding:4px 10px;border-radius:6px;'>
-                                <option value='jour'>Jour</option>
-                                <option value='semaine'>Semaine</option>
-                                <option value='mois'>Mois</option>
-                                <option value='annee'>Année</option>
-                                <option value='tout'>Tout</option>
-                            </select>
-                        </div>`;
-                        html += `<div id='cloture-table-others-${idx}'></div>`;
-                        found = found || (data && data.clotures_log && Object.keys(data.clotures_log).length > 0);
-                    });
-                    if (!found) html = '<div style="color:#aaa;">Aucune clôture enregistrée pour les autres utilisateurs.</div>';
-                    statsContent.innerHTML = html;
-                    // Après injection du HTML, attache les listeners et fait le rendu
-                    userList.forEach(({ name, data, idx }) => {
-                        const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
-                        function filterLogsOthers(period) {
-                            const now = new Date();
-                            let filtered = logs;
-                            if (period === 'jour') {
-                                const today = now.toISOString().slice(0,10);
-                                filtered = logs.filter(l => l.date === today);
-                            } else if (period === 'semaine') {
-                                const weekStart = new Date(now);
-                                weekStart.setDate(now.getDate() - now.getDay());
-                                const weekEnd = new Date(weekStart);
-                                weekEnd.setDate(weekStart.getDate() + 6);
-                                filtered = logs.filter(l => {
-                                    const d = new Date(l.date);
-                                    return d >= weekStart && d <= weekEnd;
-                                });
-                            } else if (period === 'mois') {
-                                const ym = now.toISOString().slice(0,7);
-                                filtered = logs.filter(l => l.date && l.date.startsWith(ym));
-                            } else if (period === 'annee') {
-                                const y = now.getFullYear().toString();
-                                filtered = logs.filter(l => l.date && l.date.startsWith(y));
-                            }
-                            return filtered.sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-                        }
-                        function renderTableOthers(period) {
-                            const filtered = filterLogsOthers(period);
+                    function countTypes(logs) {
+                        const types = { normal: 0, important: 0, urgent: 0, bloquant: 0 };
+                        logs.forEach(l => { if (types[l.type] !== undefined) types[l.type]++; });
+                        return types;
+                    }
+                    function renderAllTables(period) {
+                        userList.forEach(({ name, data }, idx) => {
+                            const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
+                            let summary = '';
                             let table = '';
-                            if (filtered.length > 0) {
-                                table += `<div style='max-height:420px;overflow-y:auto;'><table style='width:100%;border-collapse:collapse;margin-top:8px;'>
-                                    <thead><tr style='background:#222;'>
-                                        <th style='padding:6px 14px;'>Date</th>
-                                        <th>Normal</th>
-                                        <th>Important</th>
-                                        <th>Urgent</th>
-                                        <th>Bloquant</th>
-                                        <th>Total</th>
-                                    </tr></thead><tbody>` +
-                                    filtered.map(log => `<tr><td style='padding:6px 14px;'>${log.date}</td><td style='padding:6px 14px;'>${log.time}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`).join('') +
-                                    `</tbody></table></div>`;
+                            if (period === 'jour') {
+                                // JOUR : résumé + détail déroulable
+                                const filtered = filterLogs(logs, period);
+                                const types = countTypes(filtered);
+                                const total = filtered.length;
+                                summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
+                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                                table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead><tbody>`;
+                                filtered.sort((a, b) => (b.time||'').localeCompare(a.time||'')).forEach(log => {
+                                    table += `<tr><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                });
+                                table += `</tbody></table>`;
+                                document.getElementById('user-summary-' + idx).innerHTML = summary;
+                                document.getElementById('user-table-' + idx).innerHTML = table;
+                            } else if (period === 'semaine' || period === 'mois') {
+                                // SEMAINE/MOIS : tableau synthétique par jour
+                                let days = [];
+                                const now = new Date();
+                                if (period === 'semaine') {
+                                    const weekStart = new Date(now);
+                                    weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
+                                    for (let i=0; i<7; i++) {
+                                        const d = new Date(weekStart);
+                                        d.setDate(weekStart.getDate() + i);
+                                        days.push(d.toISOString().slice(0,10));
+                                    }
+                                } else if (period === 'mois') {
+                                    const ym = now.toISOString().slice(0,7);
+                                    const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+                                    for (let d=1; d<=daysInMonth; d++) {
+                                        days.push(ym + '-' + (d<10?'0':'')+d);
+                                    }
+                                }
+                                summary = `<div style='margin-bottom:8px;'><b>Appels par ${period === 'semaine' ? 'jour de la semaine' : 'jour du mois'} :</b></div>`;
+                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                                table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
+                                days.forEach((date, dIdx) => {
+                                    const dayLogs = logs.filter(l => l.date === date);
+                                    const types = countTypes(dayLogs);
+                                    const total = dayLogs.length;
+                                    const dayName = new Date(date).toLocaleDateString('fr-FR', { weekday: 'long' });
+                                    table += `<tr style='background:${dIdx%2?'#23272f':'#1a1d22'};'>`+
+                                        `<td style='padding:6px 14px;'>${dayName} ${date}</td>`+
+                                        `<td style='font-weight:bold;color:#4caf50;'>${total}</td>`+
+                                        `<td>${formatStatNumber(types.normal, 'normal')}</td>`+
+                                        `<td>${formatStatNumber(types.important, 'important')}</td>`+
+                                        `<td>${formatStatNumber(types.urgent, 'urgent')}</td>`+
+                                        `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>`+
+                                        `<td><button class='show-day-detail-btn' data-idx='${idx}' data-date='${date}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;'>▼</button></td>`+
+                                    `</tr>`;
+                                    table += `<tr id='detail-${idx}-${date}' style='display:none;background:#23272f;'><td colspan='7'></td></tr>`;
+                                });
+                                table += `</tbody></table>`;
+                                document.getElementById('user-summary-' + idx).innerHTML = summary;
+                                document.getElementById('user-table-' + idx).innerHTML = table;
+                            } else if (period === 'annee') {
+                                // ANNEE : tableau synthétique par mois
+                                const now = new Date();
+                                const year = now.getFullYear();
+                                let months = [];
+                                for (let m=1; m<=12; m++) {
+                                    const month = year + '-' + (m<10?'0':'')+m;
+                                    months.push(month);
+                                }
+                                summary = `<div style='margin-bottom:8px;'><b>Appels par mois :</b></div>`;
+                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                                table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Mois</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
+                                months.forEach((month, mIdx) => {
+                                    const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
+                                    const types = countTypes(monthLogs);
+                                    const total = monthLogs.length;
+                                    const monthName = new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long' });
+                                    table += `<tr style='background:${mIdx%2?'#23272f':'#1a1d22'};'>`+
+                                        `<td style='padding:6px 14px;'>${monthName} ${month}</td>`+
+                                        `<td style='font-weight:bold;color:#4caf50;'>${total}</td>`+
+                                        `<td>${formatStatNumber(types.normal, 'normal')}</td>`+
+                                        `<td>${formatStatNumber(types.important, 'important')}</td>`+
+                                        `<td>${formatStatNumber(types.urgent, 'urgent')}</td>`+
+                                        `<td>${formatStatNumber(types.bloquant, 'bloquant')}</td>`+
+                                        `<td><button class='show-month-detail-btn' data-idx='${idx}' data-month='${month}' style='background:none;border:none;color:#26e0ce;cursor:pointer;font-size:1.1em;'>▼</button></td>`+
+                                    `</tr>`;
+                                    table += `<tr id='detail-${idx}-${month}' style='display:none;background:#23272f;'><td colspan='7'></td></tr>`;
+                                });
+                                table += `</tbody></table>`;
+                                document.getElementById('user-summary-' + idx).innerHTML = summary;
+                                document.getElementById('user-table-' + idx).innerHTML = table;
                             } else {
-                                table = `<div style='margin-top:8px;color:#aaa;'>Aucune clôture enregistrée pour cette période.</div>`;
+                                // TOUT : résumé global + détail complet
+                                const filtered = filterLogs(logs, period);
+                                const types = countTypes(filtered);
+                                const total = filtered.length;
+                                summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
+                                table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
+                                table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Type</th></tr></thead><tbody>`;
+                                filtered.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||''))).forEach(log => {
+                                    table += `<tr><td style='padding:6px 14px;'>${log.date || ''} ${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                });
+                                table += `</tbody></table>`;
+                                document.getElementById('user-summary-' + idx).innerHTML = summary;
+                                document.getElementById('user-table-' + idx).innerHTML = table;
                             }
-                            const tableDiv = document.getElementById('cloture-table-others-' + idx);
-                            if (tableDiv) tableDiv.innerHTML = table;
-                        }
-                        renderTableOthers('jour');
-                        const select = document.getElementById('cloture-filter-others-' + idx);
-                        if (select) {
-                            select.onchange = function() {
-                                renderTableOthers(this.value);
+                        });
+                        // Listeners pour dérouler les détails jour/mois
+                        document.querySelectorAll('.show-day-detail-btn').forEach(btn => {
+                            btn.onclick = function() {
+                                const idx = this.getAttribute('data-idx');
+                                const date = this.getAttribute('data-date');
+                                const detailRow = document.getElementById('detail-' + idx + '-' + date);
+                                if (!detailRow) return;
+                                if (detailRow.style.display === 'none') {
+                                    // Affiche le détail
+                                    const user = userList[idx];
+                                    const logs = user.data && user.data.clotures_log ? Object.values(user.data.clotures_log) : [];
+                                    const dayLogs = logs.filter(l => l.date === date);
+                                    let detailHtml = `<table style='width:100%;border-collapse:collapse;'><thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead><tbody>`;
+                                    dayLogs.sort((a, b) => (b.time||'').localeCompare(a.time||''));
+                                    dayLogs.forEach(log => {
+                                        detailHtml += `<tr><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                    });
+                                    detailHtml += `</tbody></table>`;
+                                    detailRow.children[0].innerHTML = detailHtml;
+                                    detailRow.style.display = '';
+                                } else {
+                                    detailRow.style.display = 'none';
+                                }
                             };
-                        }
+                        });
+                        document.querySelectorAll('.show-month-detail-btn').forEach(btn => {
+                            btn.onclick = function() {
+                                const idx = this.getAttribute('data-idx');
+                                const month = this.getAttribute('data-month');
+                                const detailRow = document.getElementById('detail-' + idx + '-' + month);
+                                if (!detailRow) return;
+                                if (detailRow.style.display === 'none') {
+                                    // Affiche le détail
+                                    const user = userList[idx];
+                                    const logs = user.data && user.data.clotures_log ? Object.values(user.data.clotures_log) : [];
+                                    const monthLogs = logs.filter(l => l.date && l.date.startsWith(month));
+                                    let detailHtml = `<table style='width:100%;border-collapse:collapse;'><thead><tr style='background:#23272f;'><th style='padding:6px 14px;'>Date</th><th>Heure</th><th>Type</th></tr></thead><tbody>`;
+                                    monthLogs.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
+                                    monthLogs.forEach(log => {
+                                        detailHtml += `<tr><td style='padding:6px 14px;'>${log.date || ''}</td><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
+                                    });
+                                    detailHtml += `</tbody></table>`;
+                                    detailRow.children[0].innerHTML = detailHtml;
+                                    detailRow.style.display = '';
+                                } else {
+                                    detailRow.style.display = 'none';
+                                }
+                            };
+                        });
+                    }
+                    // Premier rendu
+                    renderAllTables(filter);
+                    // Listener sur le filtre global
+                    document.getElementById('cloture-filter-global').onchange = function() {
+                        filter = this.value;
+                        renderAllTables(filter);
+                    };
+                    // Listener pour le toggle (flèche)
+                    document.querySelectorAll('.user-toggle').forEach(el => {
+                        el.onclick = function() {
+                            const idx = this.getAttribute('data-idx');
+                            const table = document.getElementById('user-table-' + idx);
+                            const arrow = document.getElementById('arrow-' + idx);
+                            if (table.style.display === 'none') {
+                                table.style.display = '';
+                                arrow.style.transform = 'rotate(180deg)';
+                            } else {
+                                table.style.display = 'none';
+                                arrow.style.transform = '';
+                            }
+                        };
                     });
                 }).catch(err => {
                     statsContent.innerHTML = 'Erreur lors du chargement des stats.';
@@ -950,10 +1055,14 @@
                 `;
                 const loadingElem = document.getElementById('leaderboard-loading');
                 if (loadingElem) loadingElem.style.display = 'none';
-                document.getElementById('leaderboard-content').innerHTML = leaderboardHtml;
+                const leaderboardContent = document.getElementById('leaderboard-content');
+                if (leaderboardContent) {
+                    leaderboardContent.innerHTML = leaderboardHtml;
+                }
             }).catch(err => {
                 const loadingElem = document.getElementById('leaderboard-loading');
                 if (loadingElem) loadingElem.textContent = 'Erreur lors du chargement du classement.';
+                console.error('[Gamification] Erreur lors du chargement du classement:', err);
             });
         }
         function getCurrentUserName() {
@@ -1079,9 +1188,9 @@
                                     const prioriteRow = document.querySelector('.o_form_view .o_field_widget.o_field_priority, .o_form_view .o_priority, .o_form_view [name="priority"]');
                                     if (prioriteRow) {
                                         nbEtoiles = prioriteRow.querySelectorAll('.fa-star, .o_rating_star_full, .o_priority_star.o_full').length;
-                                        if (nbEtoiles === 1) { xp = 180; typeCloture = 'important'; }
+                                        if (nbEtoiles === 1) { xp = 120; typeCloture = 'important'; }
                                         else if (nbEtoiles === 2) { xp = 140; typeCloture = 'urgent'; }
-                                        else if (nbEtoiles === 3) { xp = 120; typeCloture = 'bloquant'; }
+                                        else if (nbEtoiles === 3) { xp = 200; typeCloture = 'bloquant'; }
                                         else { xp = 100; typeCloture = 'normal'; }
                                         console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp, ', type =', typeCloture);
                                     } else {

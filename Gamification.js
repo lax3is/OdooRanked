@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.4
+// @version      0.1.6
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -603,7 +603,11 @@
                                     days.push(ym + '-' + (d<10?'0':'')+d);
                                 }
                             }
-                            summary = `<div style='margin-bottom:8px;'><b>Appels par ${period === 'semaine' ? 'jour de la semaine' : 'jour du mois'} :</b></div>`;
+                            // Résumé total sur la période
+                            const periodLogs = logs.filter(l => days.includes(l.date));
+                            const types = countTypes(periodLogs);
+                            const total = periodLogs.length;
+                            summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                             table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                             table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
                             days.forEach((date, dIdx) => {
@@ -633,7 +637,11 @@
                                 const month = year + '-' + (m<10?'0':'')+m;
                                 months.push(month);
                             }
-                            summary = `<div style='margin-bottom:8px;'><b>Appels par mois :</b></div>`;
+                            // Résumé total sur l'année
+                            const periodLogs = logs.filter(l => l.date && l.date.startsWith(year.toString()));
+                            const types = countTypes(periodLogs);
+                            const total = periodLogs.length;
+                            summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                             table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                             table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Mois</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
                             months.forEach((month, mIdx) => {
@@ -824,7 +832,11 @@
                                         days.push(ym + '-' + (d<10?'0':'')+d);
                                     }
                                 }
-                                summary = `<div style='margin-bottom:8px;'><b>Appels par ${period === 'semaine' ? 'jour de la semaine' : 'jour du mois'} :</b></div>`;
+                                // Résumé total sur la période
+                                const periodLogs = logs.filter(l => days.includes(l.date));
+                                const types = countTypes(periodLogs);
+                                const total = periodLogs.length;
+                                summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                                 table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                                 table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
                                 days.forEach((date, dIdx) => {
@@ -855,7 +867,11 @@
                                     const month = year + '-' + (m<10?'0':'')+m;
                                     months.push(month);
                                 }
-                                summary = `<div style='margin-bottom:8px;'><b>Appels par mois :</b></div>`;
+                                // Résumé total sur l'année
+                                const periodLogs = logs.filter(l => l.date && l.date.startsWith(year.toString()));
+                                const types = countTypes(periodLogs);
+                                const total = periodLogs.length;
+                                summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                                 table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                                 table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Mois</th><th>Total</th><th>Normal</th><th>Important</th><th>Urgent</th><th>Bloquant</th><th></th></tr></thead><tbody>`;
                                 months.forEach((month, mIdx) => {
@@ -1032,26 +1048,39 @@
                     rank: getCurrentRank(data.xp || 0).name
                 })).sort((a, b) => b.xp - a.xp);
                 const leaderboardHtml = `
-                  <div style="max-height:400px;overflow-y:auto;">
-                    <ol style="padding-left:0;list-style:none;">
+                  <div id='leaderboard-scrollbox' style="max-height:400px;overflow-y:auto;position:relative;scrollbar-width:none;-ms-overflow-style:none;">
+                    <ol style="padding-left:0;list-style:none;margin:0;">
                         ${leaderboard.map((user, i) => {
                             const base = getRankBaseName(user.rank);
+                            // Podium médailles
+                            let medal = '';
+                            if (i === 0) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥇</span>';
+                            else if (i === 1) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥈</span>';
+                            else if (i === 2) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥉</span>';
                             // Glow color selon la place, version discrète
                             let drop = '';
                             if (i === 0) drop = 'drop-shadow(0 0 0px #26e0ce88) drop-shadow(0 0 7px #26e0ce88) drop-shadow(0 0 12px #26e0ce44)';
                             else if (i === 1) drop = 'drop-shadow(0 0 0px #ffd70088) drop-shadow(0 0 6px #ffd70088) drop-shadow(0 0 10px #ffd70044)';
                             else if (i === 2) drop = 'drop-shadow(0 0 0px #b08d5788) drop-shadow(0 0 5px #b08d5788) drop-shadow(0 0 8px #b08d5744)';
                             else drop = 'drop-shadow(0 0 3px #8883)';
-                            return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0;font-size:1.15em;\">
-                                <span style=\"font-size:2em;padding-left:24px;display:flex;align-items:center;justify-content:center;\">
-                                    <img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:18px;background:transparent;filter:${drop};\"/>
+                            // Couleur du rang
+                            const rankColor = rankColors[base] || '#fff';
+                            return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0 18px 0;font-size:1.1em;\">
+                                <span style=\"font-size:2.5em;padding-left:8px;display:flex;align-items:center;justify-content:center;\">
+                                    <img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:20px;background:transparent;filter:${drop};margin-right:8px;\"/>
                                 </span>
-                                <span style=\"font-weight:bold;color:${rankColors[base]};min-width:120px;display:inline-block;\">${i+1}. ${user.name}</span>
-                                <span style=\"color:#888;\">${user.rank} - ${user.xp} XP</span>
+                                ${medal}
+                                <span style=\"font-weight:bold;color:#e0e0e0;font-size:1.05em;min-width:120px;display:inline-block;\">${user.name}</span>
+                                <span style=\"color:${rankColor};font-weight:bold;font-size:1.12em;margin-left:12px;min-width:100px;display:inline-block;\">${user.rank}</span>
+                                <span style=\"color:#26e0ce;font-size:1.12em;font-weight:bold;margin-left:12px;\">${user.xp} XP</span>
                             </li>`;
                         }).join('')}
                     </ol>
                   </div>
+                  <style>
+                  #leaderboard-scrollbox::-webkit-scrollbar { display: none !important; width: 0 !important; }
+                  #leaderboard-scrollbox { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+                  </style>
                 `;
                 const loadingElem = document.getElementById('leaderboard-loading');
                 if (loadingElem) loadingElem.style.display = 'none';
@@ -1064,6 +1093,16 @@
                 if (loadingElem) loadingElem.textContent = 'Erreur lors du chargement du classement.';
                 console.error('[Gamification] Erreur lors du chargement du classement:', err);
             });
+            // Ajout du JS pour le scroll par flèches
+            setTimeout(() => {
+              const scrollbox = document.getElementById('leaderboard-scrollbox');
+              const up = document.getElementById('leaderboard-arrow-up');
+              const down = document.getElementById('leaderboard-arrow-down');
+              if (scrollbox && up && down) {
+                up.onclick = () => { scrollbox.scrollBy({ top: -120, behavior: 'smooth' }); };
+                down.onclick = () => { scrollbox.scrollBy({ top: 120, behavior: 'smooth' }); };
+              }
+            }, 100);
         }
         function getCurrentUserName() {
             // Cherche dans la systray tous les spans visibles

@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.2
+// @version      0.1.3
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
 // @grant        GM_xmlhttpRequest
 // @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js
 // @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js
-// @downloadURL  https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
 // @updateURL    https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
 // ==/UserScript==
 
@@ -401,14 +400,14 @@
 
                 // Cloner le bouton Analyse pour garder le style Odoo
                 const btn = analyseBtn.cloneNode(true);
-                btn.id = 'podium-btn';
-                btn.title = 'Voir le classement';
-                btn.setAttribute('data-section', 'classement');
-                btn.innerHTML = '<span>🏆 Classement</span>';
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    showClassementMenu(btn);
-                };
+            btn.id = 'podium-btn';
+            btn.title = 'Voir le classement';
+            btn.setAttribute('data-section', 'classement');
+            btn.innerHTML = '<span>🏆 Classement</span>';
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                showClassementMenu(btn);
+            };
 
                 // Insérer juste après Analyse
                 analyseBtn.parentElement.insertAdjacentElement('afterend', btn);
@@ -589,11 +588,11 @@
                             let days = [];
                             const now = new Date();
                             if (period === 'semaine') {
-                                const weekStart = new Date(now);
-                                weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
-                                for (let i=0; i<7; i++) {
-                                    const d = new Date(weekStart);
-                                    d.setDate(weekStart.getDate() + i);
+                            const weekStart = new Date(now);
+                            weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
+                            for (let i=0; i<7; i++) {
+                                const d = new Date(weekStart);
+                                d.setDate(weekStart.getDate() + i);
                                     days.push(d.toISOString().slice(0,10));
                                 }
                             } else if (period === 'mois') {
@@ -758,12 +757,12 @@
                     statsContent.innerHTML = html;
                     // Fonction de filtrage et rendu
                     function filterLogs(logs, period) {
-                        const now = new Date();
-                        if (period === 'jour') {
-                            const today = now.toISOString().slice(0,10);
+                            const now = new Date();
+                            if (period === 'jour') {
+                                const today = now.toISOString().slice(0,10);
                             return logs.filter(l => l.date === today);
-                        } else if (period === 'semaine') {
-                            const weekStart = new Date(now);
+                            } else if (period === 'semaine') {
+                                const weekStart = new Date(now);
                             weekStart.setDate(now.getDate() - now.getDay() + 1); // Lundi
                             const weekDates = [];
                             for (let i=0; i<7; i++) {
@@ -772,11 +771,11 @@
                                 weekDates.push(d.toISOString().slice(0,10));
                             }
                             return logs.filter(l => weekDates.includes(l.date));
-                        } else if (period === 'mois') {
-                            const ym = now.toISOString().slice(0,7);
+                            } else if (period === 'mois') {
+                                const ym = now.toISOString().slice(0,7);
                             return logs.filter(l => l.date && l.date.startsWith(ym));
-                        } else if (period === 'annee') {
-                            const y = now.getFullYear().toString();
+                            } else if (period === 'annee') {
+                                const y = now.getFullYear().toString();
                             return logs.filter(l => l.date && l.date.startsWith(y));
                         }
                         return logs;

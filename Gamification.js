@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.7
+// @version      0.1.8
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -754,9 +754,11 @@
                         // Ajout du rang et de l'XP
                         const xp = data && typeof data.xp === 'number' ? data.xp : 0;
                         const rank = getCurrentRank(xp).name;
-                        html += `<div class='user-stats-block' style='margin-bottom:32px;padding:18px 18px 12px 18px;background:#23272f;border-radius:12px;'>`;
-                        html += `<div style='font-size:1.18em;font-weight:bold;margin-bottom:8px;color:#26e0ce;display:flex;align-items:center;cursor:pointer;' class='user-toggle' data-idx='${idx}'>`;
-                        html += `<span style='margin-right:8px;transition:transform 0.2s;' id='arrow-${idx}'>▼</span>${name} <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:#26e0ce;'>${rank}</span> — <span style='color:#4caf50;'>${xp} XP</span></span>`;
+                        const baseRank = getRankBaseName(rank);
+                        const rankColor = rankColors[baseRank] || '#fff';
+                        html += `<div class='user-stats-block' style='margin-bottom:32px;padding:18px 18px 12px 18px;background:#23272f;border-radius:16px;box-shadow:0 0 16px 2px #fff3;position:relative;transition:box-shadow 0.3s;'>`;
+                        html += `<div style='font-size:1.18em;font-weight:bold;margin-bottom:8px;color:#fff;display:flex;align-items:center;cursor:pointer;text-shadow:0 0 8px #fff8;' class='user-toggle' data-idx='${idx}'>`;
+                        html += `<span style='margin-right:8px;transition:transform 0.2s;' id='arrow-${idx}'>▼</span><span style='color:#fff;font-weight:bold;'>${name}</span> <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:${rankColor};font-weight:bold;'>${rank}</span> — <span style='color:#26e0ce;font-weight:bold;'>${xp} XP</span></span>`;
                         html += `</div>`;
                         html += `<div id='user-summary-${idx}'></div>`;
                         html += `<div id='user-table-${idx}' style='display:none;'></div>`;
@@ -1151,18 +1153,22 @@
                 clotureRef.transaction(current => (current || 0) + 1);
                 // Enregistrement du log détaillé (date + heure + type)
                 const logRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log');
-                logRef.push({ date: dateStr, time: timeStr, type: typeCloture });
-                // Vérification des badges
-                firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
-                    const unlocked = snapshot.val() || {};
-                    allBadges.forEach(badge => {
-                        if (!unlocked[badge.id] && badge.check(logs)) {
-                            // Débloque le badge
-                            firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
-                            // Attribue 100 XP pour l'obtention du badge
-                            awardXPToUser(userName, 100, 'badge');
-                            showBadgeUnlockedNotification(badge);
-                        }
+                logRef.push({ date: dateStr, time: timeStr, type: typeCloture }).then(() => {
+                    // Après avoir ajouté le log, relire tous les logs pour les badges
+                    firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(logSnap => {
+                        const logs = logSnap.val() ? Object.values(logSnap.val()) : [];
+                        firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
+                            const unlocked = snapshot.val() || {};
+                            allBadges.forEach(badge => {
+                                if (!unlocked[badge.id] && badge.check(logs)) {
+                                    // Débloque le badge
+                                    firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
+                                    // Attribue 100 XP pour l'obtention du badge
+                                    awardXPToUser(userName, 100, 'badge');
+                                    showBadgeUnlockedNotification(badge);
+                                }
+                            });
+                        });
                     });
                 });
             }).catch(err => {
@@ -1700,7 +1706,20 @@
             document.body.appendChild(bg);
             const popup = document.createElement('div');
             popup.id = 'badges-popup';
-            popup.style.cssText = `position: fixed;top: 50%;left: 50%;transform: translate(-50%, -50%);background: rgba(34,40,49,0.93);color: #f3f6fa;border-radius: 18px;box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);z-index: 10000;min-width: 500px;max-width: 99vw;padding: 48px 48px 32px 48px;font-family: 'Segoe UI', Arial, sans-serif;text-align: center;animation: popupIn 0.3s;backdrop-filter: blur(6px);border: 2px solid #26e0ce44;`;
+            popup.style.cssText = `position: fixed;top: 50%;left: 50%;transform: translate(-50%, -50%);background: rgba(34,40,49,0.93);color: #f3f6fa;border-radius: 18px;box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);z-index: 10000;min-width: 0;max-width: 98vw;width:95vw;max-height:90vh;overflow-y:auto;padding: 32px 8vw 24px 8vw;font-family: 'Segoe UI', Arial, sans-serif;text-align: center;animation: popupIn 0.3s;backdrop-filter: blur(6px);border: 2px solid #26e0ce44;`;
+            // Ajout d'un style pour masquer la scrollbar mais permettre le scroll
+            if (!document.getElementById('badges-scrollbar-style')) {
+                const style = document.createElement('style');
+                style.id = 'badges-scrollbar-style';
+                style.innerHTML = `
+                #badges-popup::-webkit-scrollbar { display: none !important; width: 0 !important; }
+                #badges-popup { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+                @media (max-width: 600px) {
+                  #badges-popup { padding: 12px 2vw 12px 2vw !important; }
+                }
+                `;
+                document.head.appendChild(style);
+            }
             popup.innerHTML = `<div style="font-size:2.2em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">🎖️ Mes badges</div><div id='badges-list' style='display:flex;flex-wrap:wrap;gap:32px;justify-content:center;'></div><button id="close-badges-btn" style="margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;">Fermer</button>`;
             document.body.appendChild(popup);
             document.getElementById('close-badges-btn').onclick = () => { popup.remove(); bg.remove(); };
@@ -1783,6 +1802,15 @@
                 style.innerHTML = `@keyframes badgeNotifIn { from { top:-120px; opacity:0; } to { top:32px; opacity:1; } }`;
                 document.head.appendChild(style);
             }
+        }
+
+        // Ajout du style CSS global pour glowing si pas déjà présent
+        if (!document.getElementById('user-stats-glow-style')) {
+            const style = document.createElement('style');
+            style.id = 'user-stats-glow-style';
+            style.innerHTML = `.user-stats-block { box-shadow:0 0 16px 2px #fff3 !important; }
+            .user-stats-block:hover { box-shadow:0 0 32px 6px #fff7 !important; }`;
+            document.head.appendChild(style);
         }
 
     }

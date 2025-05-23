@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.9
+// @version      0.2.0
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -399,6 +399,19 @@
                     return;
                 }
 
+                // Vérifie si on est bien sur une page ticket (liste ou fiche)
+                const url = window.location.href;
+                const isTicketList = url.includes('model=helpdesk.ticket') && url.includes('view_type=list');
+                const isTicketForm = url.includes('model=helpdesk.ticket') && url.includes('view_type=form');
+                if (!(isTicketList || isTicketForm)) {
+                    // Si le bouton existe déjà, le masquer
+                    const podiumBtn = document.getElementById('podium-btn');
+                    if (podiumBtn) podiumBtn.style.display = 'none';
+                    const badgesBtn = document.getElementById('badges-btn');
+                    if (badgesBtn) badgesBtn.style.display = 'none';
+                    return;
+                }
+
                 // Cloner le bouton Analyse pour garder le style Odoo
                 const btn = analyseBtn.cloneNode(true);
             btn.id = 'podium-btn';
@@ -551,7 +564,7 @@
                     const rank = getCurrentRank(xp).name;
                     const logs = data && data.clotures_log ? Object.values(data.clotures_log) : [];
                     let filter = 'jour';
-                    let html = `<div style='font-size:1.3em;margin-bottom:12px;'><b>${userName}</b> <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:#26e0ce;'>${rank}</span> — <span style='color:#4caf50;'>${xp} XP</span></span></div>`;
+                    let html = `<div style='font-size:1.3em;margin-bottom:12px;'><b style='color:#fff;'>${userName}</b> <span style='font-size:0.95em;font-weight:normal;color:#fff;margin-left:16px;'>— <span style='color:${rankColors[getRankBaseName(rank)]};font-weight:bold;'>${rank}</span> — <span style='color:#26e0ce;font-weight:bold;'>${xp} XP</span></span></div>`;
                     html += `<div style='margin-bottom:18px;'><label for='cloture-filter-me' style='margin-right:8px;'>Filtrer par :</label><select id='cloture-filter-me' style='padding:4px 10px;border-radius:6px;'>` +
                         `<option value='jour'>Jour</option>`+
                         `<option value='semaine'>Semaine</option>`+
@@ -1336,6 +1349,17 @@
                         updateUI({ xp });
                     });
                 }
+                // Affiche/masque les boutons Classement et Badges selon la page
+                const url = window.location.href;
+                const isTicketList = url.includes('model=helpdesk.ticket') && url.includes('view_type=list');
+                const isTicketForm = url.includes('model=helpdesk.ticket') && url.includes('view_type=form');
+                const podiumBtn = document.getElementById('podium-btn');
+                const badgesBtn = document.getElementById('badges-btn');
+                if (podiumBtn) podiumBtn.style.display = (isTicketList || isTicketForm) ? '' : 'none';
+                if (badgesBtn) badgesBtn.style.display = (isTicketList || isTicketForm) ? '' : 'none';
+                // Ajout automatique des boutons si besoin
+                addPodiumButton();
+                addBadgesButton();
             }
         }, 500);
         if (!document.getElementById('podium-animations')) {
@@ -1809,7 +1833,15 @@
             const style = document.createElement('style');
             style.id = 'user-stats-glow-style';
             style.innerHTML = `.user-stats-block { box-shadow:0 0 16px 2px #fff3 !important; }
-            .user-stats-block:hover { box-shadow:0 0 32px 6px #fff7 !important; }`;
+            .user-stats-block:hover { box-shadow:0 0 32px 6px #fff7 !important; }
+            #users-stats-list::-webkit-scrollbar { display: none !important; width: 0 !important; }
+            #users-stats-list { scrollbar-width: none !important; -ms-overflow-style: none !important; padding: 18px 18px !important; position: relative; width: calc(100% - 48px) !important; margin: 0 auto !important; }
+            .user-stats-block { margin: 0 -18px 32px -18px !important; }
+            @media (max-width: 900px) { #me-table { overflow-x: auto !important; width: 100% !important; display: block !important; } }
+            #stats-popup { max-height: 90vh !important; overflow-y: auto !important; }
+            #stats-popup::-webkit-scrollbar { display: none !important; width: 0 !important; }
+            #stats-popup { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+            @media (max-width: 700px) { #stats-popup { padding: 18px 4vw 18px 4vw !important; } }`;
             document.head.appendChild(style);
         }
     }

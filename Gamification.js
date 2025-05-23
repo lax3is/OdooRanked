@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.6
+// @version      0.1.7
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -194,9 +194,9 @@
                 min-width: 220px;
                 font-family: 'Segoe UI', Arial, sans-serif;
                 transition: box-shadow 0.3s, width 0.3s, min-width 0.3s, background 0.5s, color 0.5s;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
                 animation: glowing 2s infinite alternate;
             `;
             gamificationUI.style.display = 'none';
@@ -281,8 +281,8 @@
                     border-radius: 50%;
                     width: ${badgeSize}px;
                     height: ${badgeSize}px;
-                    display: flex;
-                    align-items: center;
+            display: flex;
+            align-items: center;
                     justify-content: center;
                     box-shadow: none;
                 `;
@@ -337,11 +337,11 @@
                 box-shadow: 0 0 0 0 ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
                 padding: 56px 80px 48px 80px;
                 font-family: 'Segoe UI', Arial, sans-serif;
-                text-align: center;
+            text-align: center;
                 font-size: 2em;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
                 gap: 32px;
                 animation: fadeInNotif 0.3s, glowingNotif 2.2s infinite alternate;
                 border: 3px solid ${bgColor};
@@ -390,7 +390,7 @@
         }
         function addPodiumButton() {
             if (document.getElementById('podium-btn')) return;
-            
+
             function tryAddButton() {
                 // Chercher le bouton Analyse dans la navbar
                 const analyseBtn = document.querySelector('.o_menu_sections .dropdown-toggle[title="Analyse"]');
@@ -520,7 +520,7 @@
                 max-width: 99vw;
                 padding: 64px 80px 48px 80px;
                 font-family: 'Segoe UI', Arial, sans-serif;
-                text-align: center;
+            text-align: center;
                 animation: popupIn 0.3s;
                 backdrop-filter: blur(6px);
                 border: 2px solid #26e0ce44;
@@ -663,13 +663,13 @@
                             table += `</tbody></table>`;
                             document.getElementById('me-summary').innerHTML = summary;
                             document.getElementById('me-table').innerHTML = table;
-                        } else {
+            } else {
                             const types = countTypes(logs);
                             const total = logs.length;
                             summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                             table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                             table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Date</th><th>Heure</th><th>Type</th></tr></thead><tbody>`;
-                            logs.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||''))); 
+                            logs.sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||'')));
                             logs.forEach(log => {
                                 table += `<tr><td style='padding:6px 14px;'>${log.date || ''}</td><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
                             });
@@ -694,7 +694,7 @@
                                     detailHtml += `</tbody></table>`;
                                     detailRow.children[0].innerHTML = detailHtml;
                                     detailRow.style.display = '';
-                                } else {
+            } else {
                                     detailRow.style.display = 'none';
                                 }
                             };
@@ -929,7 +929,7 @@
                                     detailHtml += `</tbody></table>`;
                                     detailRow.children[0].innerHTML = detailHtml;
                                     detailRow.style.display = '';
-                                } else {
+            } else {
                                     detailRow.style.display = 'none';
                                 }
                             };
@@ -953,7 +953,7 @@
                                     detailHtml += `</tbody></table>`;
                                     detailRow.children[0].innerHTML = detailHtml;
                                     detailRow.style.display = '';
-                                } else {
+                } else {
                                     detailRow.style.display = 'none';
                                 }
                             };
@@ -975,7 +975,7 @@
                             if (table.style.display === 'none') {
                                 table.style.display = '';
                                 arrow.style.transform = 'rotate(180deg)';
-                            } else {
+            } else {
                                 table.style.display = 'none';
                                 arrow.style.transform = '';
                             }
@@ -1068,7 +1068,7 @@
                             return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0 18px 0;font-size:1.1em;\">
                                 <span style=\"font-size:2.5em;padding-left:8px;display:flex;align-items:center;justify-content:center;\">
                                     <img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:20px;background:transparent;filter:${drop};margin-right:8px;\"/>
-                                </span>
+                        </span>
                                 ${medal}
                                 <span style=\"font-weight:bold;color:#e0e0e0;font-size:1.05em;min-width:120px;display:inline-block;\">${user.name}</span>
                                 <span style=\"color:${rankColor};font-weight:bold;font-size:1.12em;margin-left:12px;min-width:100px;display:inline-block;\">${user.rank}</span>
@@ -1076,7 +1076,7 @@
                             </li>`;
                         }).join('')}
                     </ol>
-                  </div>
+                    </div>
                   <style>
                   #leaderboard-scrollbox::-webkit-scrollbar { display: none !important; width: 0 !important; }
                   #leaderboard-scrollbox { scrollbar-width: none !important; -ms-overflow-style: none !important; }
@@ -1152,6 +1152,19 @@
                 // Enregistrement du log détaillé (date + heure + type)
                 const logRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log');
                 logRef.push({ date: dateStr, time: timeStr, type: typeCloture });
+                // Vérification des badges
+                firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
+                    const unlocked = snapshot.val() || {};
+                    allBadges.forEach(badge => {
+                        if (!unlocked[badge.id] && badge.check(logs)) {
+                            // Débloque le badge
+                            firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
+                            // Attribue 100 XP pour l'obtention du badge
+                            awardXPToUser(userName, 100, 'badge');
+                            showBadgeUnlockedNotification(badge);
+                        }
+                    });
+                });
             }).catch(err => {
                 console.error('[Gamification] Erreur lors de la lecture Firebase :', err);
                 alert('Erreur lecture Firebase : ' + err.message);
@@ -1162,7 +1175,7 @@
             if (notification) {
                 notification.remove();
             }
-            
+
             notification = document.createElement('div');
             notification.id = 'xp-gain-notification';
             notification.style.cssText = `                position: fixed;
@@ -1183,14 +1196,14 @@
                 align-items: center;
                 gap: 8px;
             `;
-            
+
             notification.innerHTML = `
                 <span style="font-size: 1.2em;">✨</span>
                 <span>+${amount} XP</span>
             `;
-            
+
             document.body.appendChild(notification);
-            
+
             // Supprime la notification après l'animation
             setTimeout(() => {
                 notification.remove();
@@ -1260,7 +1273,7 @@
                                     console.log('[Gamification] Nom utilisateur détecté :', userName);
                                     console.log('[Gamification] Attribution de', xp, 'XP à', userName, 'Type:', typeCloture);
                                     awardXPToUser(userName, xp, typeCloture);
-                                } else {
+        } else {
                                     console.log('[Gamification] Condition non remplie : XP non attribuée');
                                 }
                             }, 1200);
@@ -1295,7 +1308,7 @@
                 } else if (tries < 20) { // essaie pendant 4 secondes max
                     tries++;
                     setTimeout(tryInit, 200);
-                } else {
+                    } else {
                     console.warn('[Gamification] Impossible de trouver le nom utilisateur après plusieurs essais.');
                 }
             }
@@ -1351,19 +1364,19 @@
             style.id = 'xp-animations';
             style.innerHTML = `
                 @keyframes xpGainAnimation {
-                    0% { 
+                    0% {
                         opacity: 0;
                         transform: translate(-50%, 20px);
                     }
-                    20% { 
+                    20% {
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    80% { 
+                    80% {
                         opacity: 1;
                         transform: translate(-50%, 0);
                     }
-                    100% { 
+                    100% {
                         opacity: 0;
                         transform: translate(-50%, -20px);
                     }
@@ -1503,16 +1516,274 @@
                 bg.remove();
             };
             // Ajoute event sur chaque jour du popup
-            setTimeout(() => {
+                    setTimeout(() => {
                 document.querySelectorAll('.show-day-detail-btn-popup').forEach(btn => {
                     btn.addEventListener('click', function(e) {
                         e.preventDefault();
                         const date = this.getAttribute('data-date');
                         const logs = JSON.parse(decodeURIComponent(this.getAttribute('data-logs')));
                         showDayDetailPopup(date, logs);
-                    });
                 });
+        });
             }, 0);
         }
+
+        // === BADGES (HAUTS FAITS) ===
+        const allBadges = [
+            {
+                id: 'poussin_motive',
+                name: 'Poussin motivé',
+                phrase: 'Il faut un début à tout…',
+                description: 'Clôturer 5 tickets en une seule journée',
+                img: 'https://i.imgur.com/xYip92S.png',
+                check: function(logs) {
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    return Object.values(byDay).some(v => v >= 5);
+                }
+            },
+            {
+                id: 'roi_tombe',
+                name: 'La Tête du roi est tombée...',
+                phrase: 'Le trône vacille, tu as frappé fort !',
+                description: 'Clôturer plus de 61 tickets en une seule journée',
+                img: 'https://i.imgur.com/MaC8BD8.png',
+                check: function(logs) {
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    return Object.values(byDay).some(v => v > 61);
+                }
+            },
+            {
+                id: 'allokoi',
+                name: 'Allô quoi !',
+                phrase: "J'ai appelé 10 fois. Même Nabilla n'a pas fait mieux.",
+                description: 'Clôturer 10 tickets en une seule journée',
+                img: 'https://i.imgur.com/ziLlvJr.png',
+                check: function(logs) {
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    return Object.values(byDay).some(v => v >= 10);
+                }
+            },
+            {
+                id: 'agent_007',
+                name: 'Agent 007',
+                phrase: '0 pause 0 café 7 appels',
+                description: 'Clôturer 7 tickets en moins d\'une heure',
+                img: 'https://i.imgur.com/t5qs7s8.png',
+                check: function(logs) {
+                    // On trie les logs par date+heure croissante
+                    const sorted = logs
+                        .filter(l => l.date && l.time)
+                        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+                    // Pour chaque log, on regarde s'il y a 7 clôtures dans la même heure glissante
+                    for (let i = 0; i <= sorted.length - 7; i++) {
+                        const first = sorted[i];
+                        const last = sorted[i + 6];
+                        // On convertit date+time en timestamp
+                        const start = new Date(first.date + 'T' + (first.time || '00:00')).getTime();
+                        const end = new Date(last.date + 'T' + (last.time || '00:00')).getTime();
+                        if (end - start <= 60 * 60 * 1000) { // 1 heure en ms
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            },
+            {
+                id: 'un_nouvelle_famille',
+                name: 'Un Nouvelle Famille',
+                phrase: 'Tu es resté assez longtemps avec ce client pour te considérer comme un nouveau membre de la famille, bravo !',
+                description: 'Rester plus de 50 minutes avec un client',
+                img: 'https://i.imgur.com/I0qNYnJ.png',
+                check: function(logs) {
+                    // On cherche un log avec une durée >= 50 minutes
+                    return logs.some(l => l.duree && Number(l.duree) >= 50);
+                }
+            },
+            {
+                id: 'le_repas_de_famille',
+                name: 'Le repas de famille',
+                phrase: 'Après être entré dans sa famille, place au repas que tout le monde apprécie tant. Haaa la belle famille…',
+                description: 'Rester plus de 2h avec un client au téléphone',
+                img: 'https://i.imgur.com/EeN6147.png',
+                check: function(logs) {
+                    // On cherche un log avec une durée >= 120 minutes
+                    return logs.some(l => l.duree && Number(l.duree) >= 120);
+                }
+            },
+            {
+                id: 'naissance_hero',
+                name: "La naissance d'un hero ?",
+                phrase: "Qu'on mette une cape sur ce super mec / meuf",
+                description: '20 appels jours',
+                img: 'https://i.imgur.com/kz6asVd.png',
+                check: function(logs) {
+                    // On cherche un jour avec au moins 20 clôtures
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    return Object.values(byDay).some(v => v >= 20);
+                }
+            },
+            {
+                id: 'legende_hotline',
+                name: "La légende de la hotline",
+                phrase: "tu n'as plus rien à prouver . Mais te la Pete pas non plus .",
+                description: "30 appels en une journée",
+                img: 'https://i.imgur.com/Z0dagDT.png',
+                check: function(logs) {
+                    // On cherche un jour avec au moins 30 clôtures
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    return Object.values(byDay).some(v => v >= 30);
+                }
+            },
+            {
+                id: 'pastaga_51',
+                name: "Ho mon Pastaga que je t'aime",
+                phrase: "Ho mon Pastaga que je t'aime",
+                description: "51 appels en deux jours (pile-poil 51)",
+                img: 'https://i.imgur.com/fTaJQAr.png',
+                check: function(logs) {
+                    // On cherche deux jours consécutifs avec au total exactement 51 clôtures
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    const dates = Object.keys(byDay).sort();
+                    for (let i = 0; i < dates.length - 1; i++) {
+                        const d1 = dates[i];
+                        const d2 = dates[i+1];
+                        // Vérifie que les deux jours sont consécutifs
+                        const date1 = new Date(d1);
+                        const date2 = new Date(d2);
+                        if ((date2 - date1) === 24*60*60*1000) {
+                            if ((byDay[d1] + byDay[d2]) === 51) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+            },
+            // D'autres badges à venir...
+        ];
+
+        // Ajout du bouton Badges dans le menu
+        function addBadgesButton() {
+            if (document.getElementById('badges-btn')) return;
+            // Chercher le bouton Classement
+            const classementBtn = document.getElementById('podium-btn');
+            if (!classementBtn) return setTimeout(addBadgesButton, 1000);
+            // Cloner le bouton Classement pour garder le style
+            const btn = classementBtn.cloneNode(true);
+            btn.id = 'badges-btn';
+            btn.title = 'Voir les badges';
+            btn.setAttribute('data-section', 'badges');
+            btn.innerHTML = '<span>🎖️ Badges</span>';
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                showBadgesPopup();
+            };
+            classementBtn.parentElement.insertAdjacentElement('afterend', btn);
+        }
+        addBadgesButton();
+
+        // Affichage de la popup des badges
+        function showBadgesPopup() {
+            let old = document.getElementById('badges-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('badges-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'badges-bg';
+            bg.style.cssText = `position: fixed;top: 0; left: 0; right: 0; bottom: 0;background: rgba(0,0,0,0.35);z-index: 9999;animation: fadeInBg 0.3s;`;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'badges-popup';
+            popup.style.cssText = `position: fixed;top: 50%;left: 50%;transform: translate(-50%, -50%);background: rgba(34,40,49,0.93);color: #f3f6fa;border-radius: 18px;box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);z-index: 10000;min-width: 500px;max-width: 99vw;padding: 48px 48px 32px 48px;font-family: 'Segoe UI', Arial, sans-serif;text-align: center;animation: popupIn 0.3s;backdrop-filter: blur(6px);border: 2px solid #26e0ce44;`;
+            popup.innerHTML = `<div style="font-size:2.2em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">🎖️ Mes badges</div><div id='badges-list' style='display:flex;flex-wrap:wrap;gap:32px;justify-content:center;'></div><button id="close-badges-btn" style="margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;">Fermer</button>`;
+            document.body.appendChild(popup);
+            document.getElementById('close-badges-btn').onclick = () => { popup.remove(); bg.remove(); };
+            bg.onclick = () => { popup.remove(); bg.remove(); };
+            // Charger les badges débloqués
+            const userName = getCurrentUserName();
+            firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
+                const unlocked = snapshot.val() || {};
+                const list = document.getElementById('badges-list');
+                list.innerHTML = allBadges.map(badge => {
+                    const isUnlocked = unlocked[badge.id];
+                    return `<div style='background:${isUnlocked ? '#23272f' : '#181a1f'};border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:0 0 12px 2px #26e0ce22;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:${isUnlocked?1:0.5};'>
+                        <img src='${badge.img}' alt='${badge.name}' class='badge-img-clickable' style='width:70px;height:70px;object-fit:contain;filter:${isUnlocked?'':'grayscale(1)'};cursor:pointer;' data-img='${badge.img}' data-name='${badge.name}'/>
+                        <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;'>${badge.name}</div>
+                        <div style='font-size:1em;color:#fff;margin-bottom:2px;'>${badge.phrase}</div>
+                        <div style='font-size:0.98em;color:#aaa;'>${badge.description}</div>
+                        ${isUnlocked ? `<div style='margin-top:6px;color:#4caf50;font-weight:bold;'>Débloqué !</div>` : ''}
+                    </div>`;
+                }).join('');
+                // Ajout du clic pour agrandir l'image
+                setTimeout(() => {
+                    document.querySelectorAll('.badge-img-clickable').forEach(img => {
+                        img.onclick = function(e) {
+                            e.stopPropagation();
+                            // Supprime toute popup d'image précédente
+                            let old = document.getElementById('badge-img-popup');
+                            let oldBg = document.getElementById('badge-img-bg');
+                            if (old) old.remove();
+                            if (oldBg) oldBg.remove();
+                            // Crée le fond
+                            const bg = document.createElement('div');
+                            bg.id = 'badge-img-bg';
+                            bg.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:10001;';
+                            document.body.appendChild(bg);
+                            // Crée la popup
+                            const popup = document.createElement('div');
+                            popup.id = 'badge-img-popup';
+                            popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(34,40,49,0.97);padding:32px 32px 24px 32px;border-radius:18px;box-shadow:0 0 32px 8px #26e0ce,0 8px 32px rgba(0,0,0,0.18);z-index:10002;display:flex;flex-direction:column;align-items:center;';
+                            popup.innerHTML = `<img src='${img.dataset.img}' alt='${img.dataset.name}' style='max-width:320px;max-height:320px;object-fit:contain;margin-bottom:18px;'/><div style='color:#26e0ce;font-size:1.2em;font-weight:bold;'>${img.dataset.name}</div><button id='close-badge-img-btn' style='margin-top:18px;padding:8px 24px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;'>Fermer</button>`;
+                            document.body.appendChild(popup);
+                            document.getElementById('close-badge-img-btn').onclick = () => { popup.remove(); bg.remove(); };
+                            bg.onclick = () => { popup.remove(); bg.remove(); };
+                        };
+                    });
+                }, 0);
+            });
+        }
+
+        // Vérification des badges à chaque cloture
+        function checkAndUnlockBadges(userName, logs) {
+            firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
+                const unlocked = snapshot.val() || {};
+                allBadges.forEach(badge => {
+                    if (!unlocked[badge.id] && badge.check(logs)) {
+                        // Débloque le badge
+                        firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
+                        // Attribue 100 XP pour l'obtention du badge
+                        awardXPToUser(userName, 100, 'badge');
+                        showBadgeUnlockedNotification(badge);
+                    }
+                });
+            });
+        }
+
+        // Notification animée de badge débloqué
+        function showBadgeUnlockedNotification(badge) {
+            let notif = document.getElementById('badge-unlocked-notif');
+            if (notif) notif.remove();
+            notif = document.createElement('div');
+            notif.id = 'badge-unlocked-notif';
+            notif.style.cssText = `position:fixed;top:-120px;left:50%;transform:translateX(-50%);background:rgba(38,224,206,0.97);color:#222;padding:24px 38px 24px 38px;border-radius:18px;box-shadow:0 0 32px 8px #26e0ce,0 8px 32px rgba(0,0,0,0.18);z-index:10001;min-width:320px;max-width:90vw;font-family:'Segoe UI',Arial,sans-serif;text-align:center;font-size:1.25em;display:flex;flex-direction:column;align-items:center;gap:12px;animation:badgeNotifIn 0.7s forwards;`;
+            notif.innerHTML = `<div style='font-size:1.5em;font-weight:bold;color:#fff;margin-bottom:4px;'>🎉 Félicitations !</div><img src='${badge.img}' alt='${badge.name}' style='width:80px;height:80px;object-fit:contain;margin-bottom:8px;'/><div style='font-size:1.18em;font-weight:bold;color:#23272f;margin-bottom:2px;'>${badge.name}</div><div style='font-size:1.05em;color:#23272f;margin-bottom:2px;'>${badge.phrase}</div><div style='font-size:0.98em;color:#222;'>${badge.description}</div>`;
+            document.body.appendChild(notif);
+            setTimeout(() => { notif.style.top = '32px'; }, 50);
+            setTimeout(() => { notif.style.top = '-120px'; setTimeout(()=>notif.remove(), 600); }, 5200);
+            // Animation CSS
+            if (!document.getElementById('badge-animations')) {
+                const style = document.createElement('style');
+                style.id = 'badge-animations';
+                style.innerHTML = `@keyframes badgeNotifIn { from { top:-120px; opacity:0; } to { top:32px; opacity:1; } }`;
+                document.head.appendChild(style);
+            }
+        }
+
     }
 })(); 

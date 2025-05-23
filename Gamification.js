@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.2.0
+// @version      0.2.1
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -822,7 +822,8 @@
                                 summary = `<div style='margin-bottom:8px;'><b>Total appels</b> : <span style='color:#4caf50;font-weight:bold;font-size:1.15em;'>${total}</span> | Normal : ${formatStatNumber(types.normal, 'normal')} | Important : ${formatStatNumber(types.important, 'important')} | Urgent : ${formatStatNumber(types.urgent, 'urgent')} | Bloquant : ${formatStatNumber(types.bloquant, 'bloquant')}</div>`;
                                 table += `<table style='width:100%;border-collapse:collapse;margin-top:8px;'>`;
                                 table += `<thead><tr style='background:#222;'><th style='padding:6px 14px;'>Heure</th><th>Type</th></tr></thead><tbody>`;
-                                filtered.sort((a, b) => (b.time||'').localeCompare(a.time||'')).forEach(log => {
+                                filtered.sort((a, b) => (b.time||'').localeCompare(a.time||''));
+                                filtered.forEach(log => {
                                     table += `<tr><td style='padding:6px 14px;'>${log.time || ''}</td><td style='padding:6px 14px;'>${formatTypeLabel(log.type || '')}</td></tr>`;
                                 });
                                 table += `</tbody></table>`;
@@ -968,7 +969,7 @@
                                     detailHtml += `</tbody></table>`;
                                     detailRow.children[0].innerHTML = detailHtml;
                                     detailRow.style.display = '';
-                } else {
+            } else {
                                     detailRow.style.display = 'none';
                                 }
                             };
@@ -990,7 +991,7 @@
                             if (table.style.display === 'none') {
                                 table.style.display = '';
                                 arrow.style.transform = 'rotate(180deg)';
-            } else {
+                } else {
                                 table.style.display = 'none';
                                 arrow.style.transform = '';
                             }
@@ -1264,7 +1265,7 @@
                                         else if (nbEtoiles === 3) { xp = 200; typeCloture = 'bloquant'; }
                                         else { xp = 100; typeCloture = 'normal'; }
                                         console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp, ', type =', typeCloture);
-                                    } else {
+            } else {
                                         // Fallback couleur si jamais la priorité n'est pas trouvée
                                         let titreElem = document.querySelector('.o_form_view input[name="name"], .o_form_view .o_field_widget.o_field_char, .o_form_view h1, .o_form_view .o_form_label');
                                         let color = '';
@@ -1695,6 +1696,78 @@
                     return false;
                 }
             },
+            {
+                id: 'poussin_tres_motive_retour',
+                name: 'le poussin tres motivé (le retour)',
+                phrase: "t'es plutot motivé pour un vendredi, en tout cas bien plus que le poussin...",
+                description: 'Faire 7 appels un vendredi matin (avant 12h)',
+                img: 'https://i.imgur.com/roeGJ7X.png',
+                hidden: true,
+                check: function(logs) {
+                    // Cherche un vendredi avec au moins 7 appels avant 12h
+                    const byDay = {};
+                    logs.forEach(l => {
+                        if (l.date && l.time) {
+                            const dateObj = new Date(l.date + 'T' + (l.time || '00:00'));
+                            if (dateObj.getDay() === 5 && dateObj.getHours() < 12) {
+                                byDay[l.date] = (byDay[l.date]||0)+1;
+                            }
+                        }
+                    });
+                    return Object.values(byDay).some(v => v >= 7);
+                }
+            },
+            {
+                id: 'poussin_ultra_motiver_pro_max',
+                name: 'Le Poussin ULTRA MOTIVÉ pro max',
+                phrase: "Tu veux un verre d'eau ? Un café ? Mais qui peut te stopper ? En tout cas, ce n'est pas le poussin qui va t'aider...",
+                description: 'Faire 14 appels un vendredi matin (avant 12h)',
+                img: 'https://i.imgur.com/sMlUdBf.png',
+                hidden: true,
+                check: function(logs) {
+                    // Cherche un vendredi avec au moins 14 appels avant 12h
+                    const byDay = {};
+                    logs.forEach(l => {
+                        if (l.date && l.time) {
+                            const dateObj = new Date(l.date + 'T' + (l.time || '00:00'));
+                            if (dateObj.getDay() === 5 && dateObj.getHours() < 12) {
+                                byDay[l.date] = (byDay[l.date]||0)+1;
+                            }
+                        }
+                    });
+                    return Object.values(byDay).some(v => v >= 14);
+                }
+            },
+            {
+                id: 'la_machine',
+                name: 'La Machine',
+                phrase: 'Il ne mange pas. Il ne dort pas. Il clôture.',
+                description: 'Faire minimum 20 appels par jour du lundi au vendredi (5 jours ouvrés consécutifs)',
+                img: 'https://i.imgur.com/ampUz8N.png',
+                hidden: true,
+                check: function(logs) {
+                    // On cherche 5 jours consécutifs avec au moins 20 appels chaque jour (lundi à vendredi)
+                    const byDay = {};
+                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
+                    const dates = Object.keys(byDay).sort();
+                    if (dates.length < 5) return false;
+                    // Convertit les dates en timestamps pour vérifier la suite
+                    const timestamps = dates.map(d => new Date(d).getTime());
+                    for (let i = 0; i <= timestamps.length - 5; i++) {
+                        let ok = true;
+                        for (let j = 0; j < 5; j++) {
+                            const d = new Date(dates[i+j]);
+                            // Vérifie que le premier jour est un lundi
+                            if (j === 0 && d.getDay() !== 1) { ok = false; break; }
+                            // Vérifie que chaque jour est consécutif
+                            if (j > 0 && timestamps[i+j] - timestamps[i+j-1] !== 24*60*60*1000) { ok = false; break; }
+                            if (byDay[dates[i+j]] < 20) { ok = false; break; }
+                        }
+                        if (ok) return true;
+                    }
+                    return false;
+                }
+            },
             // D'autres badges à venir...
         ];
 
@@ -1755,11 +1828,12 @@
                 const list = document.getElementById('badges-list');
                 list.innerHTML = allBadges.map(badge => {
                     const isUnlocked = unlocked[badge.id];
+                    const isHidden = badge.hidden && !isUnlocked;
                     return `<div style='background:${isUnlocked ? '#23272f' : '#181a1f'};border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:none;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:${isUnlocked?1:0.5};'>
-                        <img src='${badge.img}' alt='${badge.name}' class='badge-img-clickable' style='width:70px;height:70px;object-fit:contain;border-radius:50%;background:#181a1f;filter:${isUnlocked?'':'grayscale(1)'};cursor:pointer;box-shadow:0 0 24px 6px #26e0ce88;' data-img='${badge.img}' data-name='${badge.name}'/>
-                        <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;text-shadow:0 0 12px #26e0ce;'>${badge.name}</div>
-                        <div style='font-size:1em;color:#fff;margin-bottom:2px;'>${badge.phrase}</div>
-                        <div style='font-size:0.98em;color:#aaa;'>${badge.description}</div>
+                        <img src='${badge.img}' alt='${isHidden ? 'Badge caché' : badge.name}' class='badge-img-clickable' style='width:70px;height:70px;object-fit:contain;border-radius:50%;background:#e0e0e0;filter:${isUnlocked?'':'grayscale(1) brightness(0.1)'};cursor:${isUnlocked&&!isHidden?'pointer':'default'};${isHidden?'pointer-events:none;':''}' data-img='${badge.img}' data-name='${badge.name}'/>
+                        <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;text-shadow:0 0 12px #26e0ce;'>${isHidden?'???':badge.name}</div>
+                        <div style='font-size:1em;color:#fff;margin-bottom:2px;'>${isHidden?'???':badge.phrase}</div>
+                        <div style='font-size:0.98em;color:#aaa;'>${isHidden?'???':badge.description}</div>
                         ${isUnlocked ? `<div style='margin-top:6px;color:#4caf50;font-weight:bold;'>Débloqué !</div>` : ''}
                     </div>`;
                 }).join('');
@@ -1782,7 +1856,7 @@
                             const popup = document.createElement('div');
                             popup.id = 'badge-img-popup';
                             popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(34,40,49,0.97);padding:32px 32px 24px 32px;border-radius:18px;box-shadow:0 0 32px 8px #26e0ce,0 8px 32px rgba(0,0,0,0.18);z-index:10002;display:flex;flex-direction:column;align-items:center;';
-                            popup.innerHTML = `<img src='${img.dataset.img}' alt='${img.dataset.name}' style='max-width:320px;max-height:320px;object-fit:contain;margin-bottom:18px;'/><div style='color:#26e0ce;font-size:1.2em;font-weight:bold;'>${img.dataset.name}</div><button id='close-badge-img-btn' style='margin-top:18px;padding:8px 24px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;'>Fermer</button>`;
+                            popup.innerHTML = `<img src='${img.dataset.img}' alt='${img.dataset.name}' style='max-width:320px;max-height:320px;object-fit:contain;margin-bottom:18px;border-radius:50%;background:#e0e0e0;'/><div style='color:#26e0ce;font-size:1.2em;font-weight:bold;'>${img.dataset.name}</div><button id='close-badge-img-btn' style='margin-top:18px;padding:8px 24px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;'>Fermer</button>`;
                             document.body.appendChild(popup);
                             document.getElementById('close-badge-img-btn').onclick = () => { popup.remove(); bg.remove(); };
                             bg.onclick = () => { popup.remove(); bg.remove(); };

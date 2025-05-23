@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.1.8
+// @version      0.1.9
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -1731,9 +1731,9 @@
                 const list = document.getElementById('badges-list');
                 list.innerHTML = allBadges.map(badge => {
                     const isUnlocked = unlocked[badge.id];
-                    return `<div style='background:${isUnlocked ? '#23272f' : '#181a1f'};border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:0 0 12px 2px #26e0ce22;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:${isUnlocked?1:0.5};'>
-                        <img src='${badge.img}' alt='${badge.name}' class='badge-img-clickable' style='width:70px;height:70px;object-fit:contain;filter:${isUnlocked?'':'grayscale(1)'};cursor:pointer;' data-img='${badge.img}' data-name='${badge.name}'/>
-                        <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;'>${badge.name}</div>
+                    return `<div style='background:${isUnlocked ? '#23272f' : '#181a1f'};border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:none;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:${isUnlocked?1:0.5};'>
+                        <img src='${badge.img}' alt='${badge.name}' class='badge-img-clickable' style='width:70px;height:70px;object-fit:contain;border-radius:50%;background:#181a1f;filter:${isUnlocked?'':'grayscale(1)'};cursor:pointer;box-shadow:0 0 24px 6px #26e0ce88;' data-img='${badge.img}' data-name='${badge.name}'/>
+                        <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;text-shadow:0 0 12px #26e0ce;'>${badge.name}</div>
                         <div style='font-size:1em;color:#fff;margin-bottom:2px;'>${badge.phrase}</div>
                         <div style='font-size:0.98em;color:#aaa;'>${badge.description}</div>
                         ${isUnlocked ? `<div style='margin-top:6px;color:#4caf50;font-weight:bold;'>Débloqué !</div>` : ''}
@@ -1790,16 +1790,16 @@
             if (notif) notif.remove();
             notif = document.createElement('div');
             notif.id = 'badge-unlocked-notif';
-            notif.style.cssText = `position:fixed;top:-120px;left:50%;transform:translateX(-50%);background:rgba(38,224,206,0.97);color:#222;padding:24px 38px 24px 38px;border-radius:18px;box-shadow:0 0 32px 8px #26e0ce,0 8px 32px rgba(0,0,0,0.18);z-index:10001;min-width:320px;max-width:90vw;font-family:'Segoe UI',Arial,sans-serif;text-align:center;font-size:1.25em;display:flex;flex-direction:column;align-items:center;gap:12px;animation:badgeNotifIn 0.7s forwards;`;
-            notif.innerHTML = `<div style='font-size:1.5em;font-weight:bold;color:#fff;margin-bottom:4px;'>🎉 Félicitations !</div><img src='${badge.img}' alt='${badge.name}' style='width:80px;height:80px;object-fit:contain;margin-bottom:8px;'/><div style='font-size:1.18em;font-weight:bold;color:#23272f;margin-bottom:2px;'>${badge.name}</div><div style='font-size:1.05em;color:#23272f;margin-bottom:2px;'>${badge.phrase}</div><div style='font-size:0.98em;color:#222;'>${badge.description}</div>`;
+            notif.style.cssText = `position:fixed;top:32px;left:50%;transform:translateX(-50%) scale(1);background:#23272f;color:#fff;padding:38px 48px 32px 48px;border-radius:28px;box-shadow:0 0 64px 24px #26e0ce,0 8px 32px rgba(0,0,0,0.18);z-index:10001;min-width:320px;max-width:90vw;font-family:'Segoe UI',Arial,sans-serif;text-align:center;font-size:1.25em;display:flex;flex-direction:column;align-items:center;gap:12px;animation:badgeZoomNotif 1.8s infinite alternate;`;
+            notif.innerHTML = `<div style='position:absolute;top:18px;right:24px;'><button id='close-badge-unlocked-btn' style='background:none;border:none;font-size:2em;cursor:pointer;color:#ff3b3b;'>×</button></div><div style='font-size:2.2em;font-weight:bold;color:#fff;margin-bottom:10px;text-shadow:0 0 18px #fff,0 0 32px #fff;'>🎉 Félicitations !</div><img src='${badge.img}' alt='${badge.name}' style='width:100px;height:100px;object-fit:contain;margin-bottom:12px;border-radius:50%;box-shadow:0 0 32px 8px #26e0ce88;'/><div style='font-size:1.45em;font-weight:bold;color:#fff;margin-bottom:6px;text-shadow:0 0 8px #26e0ce;'>${badge.name}</div><div style='font-size:1.1em;color:#e0e0e0;margin-bottom:2px;'>${badge.phrase}</div><div style='font-size:1.05em;color:#bfc1c2;'>${badge.description}</div>`;
             document.body.appendChild(notif);
-            setTimeout(() => { notif.style.top = '32px'; }, 50);
-            setTimeout(() => { notif.style.top = '-120px'; setTimeout(()=>notif.remove(), 600); }, 5200);
+            document.getElementById('close-badge-unlocked-btn').onclick = () => { notif.remove(); };
             // Animation CSS
             if (!document.getElementById('badge-animations')) {
                 const style = document.createElement('style');
                 style.id = 'badge-animations';
-                style.innerHTML = `@keyframes badgeNotifIn { from { top:-120px; opacity:0; } to { top:32px; opacity:1; } }`;
+                style.innerHTML = `@keyframes badgeNotifIn { from { top:-120px; opacity:0; } to { top:32px; opacity:1; } }
+                @keyframes badgeZoomNotif { 0% { transform:translateX(-50%) scale(1); } 100% { transform:translateX(-50%) scale(1.035); } }`;
                 document.head.appendChild(style);
             }
         }
@@ -1812,6 +1812,5 @@
             .user-stats-block:hover { box-shadow:0 0 32px 6px #fff7 !important; }`;
             document.head.appendChild(style);
         }
-
     }
 })(); 

@@ -1,19 +1,19 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.2.2
+// @version      0.2.3
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
 // @grant        GM_xmlhttpRequest
-// @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js
-// @require      https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js
 // @updateURL    https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
 // @downloadURL  https://raw.githubusercontent.com/lax3is/OdooRanked/refs/heads/main/Gamification.js
 // ==/UserScript==
 
 (function() {
     'use strict';
+
+    console.log('Gamification version 0.2.3 chargé');
 
     function loadScript(url, callback){
         var script = document.createElement("script");
@@ -1941,4 +1941,4 @@
             document.head.appendChild(style);
         }
     }
-})();
+})(); 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.2.1
+// @version      0.2.2
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -30,7 +30,13 @@
     });
 
     function mainGamification() {
-        console.log('[Gamification] mainGamification appelée, firebase =', typeof firebase);
+        // Vérification robuste du chargement de Firebase
+        if (typeof firebase === 'undefined') {
+            console.error('[Gamification] ERREUR : Firebase N\'est pas chargé.');
+            alert('Erreur : Firebase n\'est pas chargé. Vérifiez votre connexion internet ou les extensions qui pourraient bloquer les scripts.');
+            return;
+        }
+        // Initialisation unique et robuste
         const firebaseConfig = {
             apiKey: "AIzaSyB6OFosv9Fg6pMQv0QGxyanuOETtNCw",
             authDomain: "odooranked.firebaseapp.com",
@@ -41,8 +47,24 @@
             appId: "1:463495344412:web:3eace838263aa8124ad49",
             measurementId: "G-HZHTVQT1H8"
         };
-        if (firebase.apps.length === 0) {
-            firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps || firebase.apps.length === 0) {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                console.log('[Gamification] Firebase initialisé !');
+            } catch (e) {
+                // Si déjà initialisé par un autre script
+                if (!/already exists/.test(e.message)) {
+                    console.error('[Gamification] Erreur d\'initialisation Firebase :', e);
+                    alert('Erreur d\'initialisation Firebase : ' + e.message);
+                    return;
+                }
+            }
+        }
+        // Vérification finale
+        if (!firebase.apps || firebase.apps.length === 0) {
+            console.error('[Gamification] ERREUR : Firebase n\'a pas pu être initialisé.');
+            alert('Erreur critique : Firebase n\'a pas pu être initialisé.');
+            return;
         }
         const database = firebase.database();
 
@@ -1879,7 +1901,7 @@
                         showBadgeUnlockedNotification(badge);
                     }
                 });
-            });
+        });
         }
 
         // Notification animée de badge débloqué
@@ -1919,4 +1941,4 @@
             document.head.appendChild(style);
         }
     }
-})(); 
+})();

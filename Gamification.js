@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.2.3
+// @version      0.2.4
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -12,8 +12,6 @@
 
 (function() {
     'use strict';
-
-    console.log('Gamification version 0.2.3 chargé');
 
     function loadScript(url, callback){
         var script = document.createElement("script");
@@ -30,13 +28,7 @@
     });
 
     function mainGamification() {
-        // Vérification robuste du chargement de Firebase
-        if (typeof firebase === 'undefined') {
-            console.error('[Gamification] ERREUR : Firebase N\'est pas chargé.');
-            alert('Erreur : Firebase n\'est pas chargé. Vérifiez votre connexion internet ou les extensions qui pourraient bloquer les scripts.');
-            return;
-        }
-        // Initialisation unique et robuste
+        console.log('[Gamification] mainGamification appelée, firebase =', typeof firebase);
         const firebaseConfig = {
             apiKey: "AIzaSyB6OFosv9Fg6pMQv0QGxyanuOETtNCw",
             authDomain: "odooranked.firebaseapp.com",
@@ -47,24 +39,8 @@
             appId: "1:463495344412:web:3eace838263aa8124ad49",
             measurementId: "G-HZHTVQT1H8"
         };
-        if (!firebase.apps || firebase.apps.length === 0) {
-            try {
-                firebase.initializeApp(firebaseConfig);
-                console.log('[Gamification] Firebase initialisé !');
-            } catch (e) {
-                // Si déjà initialisé par un autre script
-                if (!/already exists/.test(e.message)) {
-                    console.error('[Gamification] Erreur d\'initialisation Firebase :', e);
-                    alert('Erreur d\'initialisation Firebase : ' + e.message);
-                    return;
-                }
-            }
-        }
-        // Vérification finale
-        if (!firebase.apps || firebase.apps.length === 0) {
-            console.error('[Gamification] ERREUR : Firebase n\'a pas pu être initialisé.');
-            alert('Erreur critique : Firebase n\'a pas pu être initialisé.');
-            return;
+        if (firebase.apps.length === 0) {
+            firebase.initializeApp(firebaseConfig);
         }
         const database = firebase.database();
 
@@ -216,9 +192,9 @@
                 min-width: 220px;
                 font-family: 'Segoe UI', Arial, sans-serif;
                 transition: box-shadow 0.3s, width 0.3s, min-width 0.3s, background 0.5s, color 0.5s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 animation: glowing 2s infinite alternate;
             `;
             gamificationUI.style.display = 'none';
@@ -228,21 +204,21 @@
                 </div>
             `;
             let panelContent = `
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:8px;">
+                    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;margin-bottom:8px;">
                     <div style="padding:0;display:flex;align-items:center;justify-content:center;background:transparent;border-radius:0;">
                         <img src="${logo}" alt="Logo Rang" style="width:110px;height:110px;object-fit:contain;border-radius:0;background:transparent;filter:${getRankGlowFilter(baseRank)};"/>
-                    </div>
+                        </div>
                     <div style="font-size:1.1em;font-weight:bold;margin-top:2px;color:#f3f6fa;text-shadow:0 0 8px #fff,0 0 16px ${color};">${currentRank.name}</div>
-                </div>
+                    </div>
                 ${nextRankXp ? `<div style="font-size:1.18em;font-weight:bold;color:#f3f6fa;text-align:center;margin-bottom:10px;text-shadow:0 1px 8px #fff,0 0 2px #0002;">
   <span style='color:#26e0ce;font-size:1.22em;'>${nextRankXp} XP</span> avant <b style='color:#f3f6fa;'>${ranks[ranks.findIndex(r => r.name === currentRank.name)+1]?.name || ""}</b>
 </div>` : ''}
-                <div style="margin:14px 0 0 0;width:100%;">
-                    <div style="background:#e5e5e5;border-radius:8px;height:14px;overflow:hidden;">
-                        <div style="background:#4caf50;height:100%;width:${Math.round(progressCircle*100)}%;transition:width 0.5s;"></div>
+                    <div style="margin:14px 0 0 0;width:100%;">
+                        <div style="background:#e5e5e5;border-radius:8px;height:14px;overflow:hidden;">
+                            <div style="background:#4caf50;height:100%;width:${Math.round(progressCircle*100)}%;transition:width 0.5s;"></div>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
             gamificationUI.innerHTML = controls + panelContent;
             // --- Notification de level up : une seule fois ---
             const userName = getCurrentUserName();
@@ -304,7 +280,7 @@
                     width: ${badgeSize}px;
                     height: ${badgeSize}px;
             display: flex;
-            align-items: center;
+                    align-items: center;
                     justify-content: center;
                     box-shadow: none;
                 `;
@@ -359,11 +335,11 @@
                 box-shadow: 0 0 0 0 ${bgColor}, 0 8px 32px rgba(0,0,0,0.18);
                 padding: 56px 80px 48px 80px;
                 font-family: 'Segoe UI', Arial, sans-serif;
-            text-align: center;
+                text-align: center;
                 font-size: 2em;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
                 gap: 32px;
                 animation: fadeInNotif 0.3s, glowingNotif 2.2s infinite alternate;
                 border: 3px solid ${bgColor};
@@ -1085,47 +1061,68 @@
                     xp: data.xp || 0,
                     rank: getCurrentRank(data.xp || 0).name
                 })).sort((a, b) => b.xp - a.xp);
+                // Récupère les ornements sélectionnés pour chaque utilisateur
+                const userOrnaments = {};
+                const ornamentPromises = Object.entries(users).map(([name, data]) => {
+                  return firebase.database().ref('users/' + name).once('value').then(snap => {
+                    const u = snap.val() || {};
+                    userOrnaments[decodeURIComponent(name)] = u.selectedOrnament || null;
+                  });
+                });
+                Promise.all(ornamentPromises).then(() => {
                 const leaderboardHtml = `
-                  <div id='leaderboard-scrollbox' style="max-height:400px;overflow-y:auto;position:relative;scrollbar-width:none;-ms-overflow-style:none;">
-                    <ol style="padding-left:0;list-style:none;margin:0;">
+                    <div id='leaderboard-scrollbox' style="max-height:400px;overflow-y:auto;position:relative;scrollbar-width:none;-ms-overflow-style:none;">
+                      <ol style="padding-left:0;list-style:none;margin:0;">
                         ${leaderboard.map((user, i) => {
                             const base = getRankBaseName(user.rank);
-                            // Podium médailles
-                            let medal = '';
-                            if (i === 0) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥇</span>';
-                            else if (i === 1) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥈</span>';
-                            else if (i === 2) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥉</span>';
-                            // Glow color selon la place, version discrète
-                            let drop = '';
-                            if (i === 0) drop = 'drop-shadow(0 0 0px #26e0ce88) drop-shadow(0 0 7px #26e0ce88) drop-shadow(0 0 12px #26e0ce44)';
-                            else if (i === 1) drop = 'drop-shadow(0 0 0px #ffd70088) drop-shadow(0 0 6px #ffd70088) drop-shadow(0 0 10px #ffd70044)';
-                            else if (i === 2) drop = 'drop-shadow(0 0 0px #b08d5788) drop-shadow(0 0 5px #b08d5788) drop-shadow(0 0 8px #b08d5744)';
-                            else drop = 'drop-shadow(0 0 3px #8883)';
-                            // Couleur du rang
-                            const rankColor = rankColors[base] || '#fff';
-                            return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0 18px 0;font-size:1.1em;\">
-                                <span style=\"font-size:2.5em;padding-left:8px;display:flex;align-items:center;justify-content:center;\">
-                                    <img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:20px;background:transparent;filter:${drop};margin-right:8px;\"/>
-                        </span>
-                                ${medal}
-                                <span style=\"font-weight:bold;color:#e0e0e0;font-size:1.05em;min-width:120px;display:inline-block;\">${user.name}</span>
-                                <span style=\"color:${rankColor};font-weight:bold;font-size:1.12em;margin-left:12px;min-width:100px;display:inline-block;\">${user.rank}</span>
-                                <span style=\"color:#26e0ce;font-size:1.12em;font-weight:bold;margin-left:12px;\">${user.xp} XP</span>
+                          let medal = '';
+                          if (i === 0) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥇</span>';
+                          else if (i === 1) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥈</span>';
+                          else if (i === 2) medal = '<span style=\'font-size:2.1em;vertical-align:middle;display:inline-block;margin-right:8px;\'>🥉</span>';
+                          let drop = '';
+                          if (i === 0) drop = 'drop-shadow(0 0 0px #26e0ce88) drop-shadow(0 0 7px #26e0ce88) drop-shadow(0 0 12px #26e0ce44)';
+                          else if (i === 1) drop = 'drop-shadow(0 0 0px #ffd70088) drop-shadow(0 0 6px #ffd70088) drop-shadow(0 0 10px #ffd70044)';
+                          else if (i === 2) drop = 'drop-shadow(0 0 0px #b08d5788) drop-shadow(0 0 5px #b08d5788) drop-shadow(0 0 8px #b08d5744)';
+                          else drop = 'drop-shadow(0 0 3px #8883)';
+                          const rankColor = rankColors[base] || '#fff';
+                          // Ornement
+                          const ornId = userOrnaments[user.name];
+                          let ornamentHtml = '';
+                          if (ornId === 'dieu_flamme') {
+                            ornamentHtml = `<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;">
+                              <img src='https://i.imgur.com/ZdQCAkg.png' alt='Flammes' style='width:110px;height:110px;object-fit:contain;pointer-events:none;'/>
+                            </span>`;
+                          }
+                          // Photo de profil + ornement
+                          const profileHtml = `<span style="position:relative;display:inline-block;width:90px;height:90px;">${ornamentHtml}<img src=\"${rankLogos[base]}\" alt=\"${base}\" style=\"width:90px;height:90px;vertical-align:middle;object-fit:contain;border-radius:20px;background:transparent;filter:${drop};margin-right:8px;position:relative;z-index:2;\"/></span>`;
+                          // Effet flammes sur le nom
+                          let nameHtml = `<span style=\"font-weight:bold;color:#e0e0e0;font-size:1.05em;min-width:120px;display:inline-block;\">${user.name}</span>`;
+                          if (ornId === 'dieu_flamme') {
+                            nameHtml = `<span class='flame-name' style="font-weight:bold;color:#fff;font-size:1.08em;min-width:120px;display:inline-block;position:relative;background:linear-gradient(90deg,#ff9800,#ffd700,#fff,#ffd700,#ff9800);background-size:200% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:flameTextAnim 2s linear infinite alternate;text-shadow:0 0 8px #ff9800,0 0 18px #ffd700;">${user.name}<span class='flame-anim' style='position:absolute;left:0;right:0;top:-18px;height:18px;pointer-events:none;z-index:2;'></span></span>`;
+                          }
+                          return `<li style=\"display:flex;align-items:center;gap:18px;justify-content:left;margin:18px 0 18px 0;font-size:1.1em;\">
+                            ${profileHtml}
+                            ${medal}
+                            ${nameHtml}
+                            <span style=\"color:${rankColor};font-weight:bold;font-size:1.12em;margin-left:12px;min-width:100px;display:inline-block;\">${user.rank}</span>
+                            <span style=\"color:#26e0ce;font-size:1.12em;font-weight:bold;margin-left:12px;\">${user.xp} XP</span>
                             </li>`;
                         }).join('')}
                     </ol>
-                    </div>
-                  <style>
-                  #leaderboard-scrollbox::-webkit-scrollbar { display: none !important; width: 0 !important; }
-                  #leaderboard-scrollbox { scrollbar-width: none !important; -ms-overflow-style: none !important; }
-                  </style>
-                `;
-                const loadingElem = document.getElementById('leaderboard-loading');
-                if (loadingElem) loadingElem.style.display = 'none';
-                const leaderboardContent = document.getElementById('leaderboard-content');
-                if (leaderboardContent) {
+                  </div>
+                    <style>
+                    @keyframes flameTextAnim {
+                      0% { background-position:0% 50%; }
+                      100% { background-position:100% 50%; }
+                    }
+                    </style>`;
+                  const loadingElem = document.getElementById('leaderboard-loading');
+                  if (loadingElem) loadingElem.style.display = 'none';
+                  const leaderboardContent = document.getElementById('leaderboard-content');
+                  if (leaderboardContent) {
                     leaderboardContent.innerHTML = leaderboardHtml;
-                }
+                  }
+                });
             }).catch(err => {
                 const loadingElem = document.getElementById('leaderboard-loading');
                 if (loadingElem) loadingElem.textContent = 'Erreur lors du chargement du classement.';
@@ -1196,7 +1193,7 @@
                         firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
                             const unlocked = snapshot.val() || {};
                             allBadges.forEach(badge => {
-                                if (!unlocked[badge.id] && badge.check(logs)) {
+                                if (typeof badge.check === 'function' && !unlocked[badge.id] && badge.check(logs)) {
                                     // Débloque le badge
                                     firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
                                     // Attribue 100 XP pour l'obtention du badge
@@ -1206,7 +1203,7 @@
                             });
                         });
                     });
-                });
+                    });
             }).catch(err => {
                 console.error('[Gamification] Erreur lors de la lecture Firebase :', err);
                 alert('Erreur lecture Firebase : ' + err.message);
@@ -1315,7 +1312,7 @@
                                     console.log('[Gamification] Nom utilisateur détecté :', userName);
                                     console.log('[Gamification] Attribution de', xp, 'XP à', userName, 'Type:', typeCloture);
                                     awardXPToUser(userName, xp, typeCloture);
-        } else {
+                                } else {
                                     console.log('[Gamification] Condition non remplie : XP non attribuée');
                                 }
                             }, 1200);
@@ -1350,7 +1347,7 @@
                 } else if (tries < 20) { // essaie pendant 4 secondes max
                     tries++;
                     setTimeout(tryInit, 200);
-                    } else {
+                } else {
                     console.warn('[Gamification] Impossible de trouver le nom utilisateur après plusieurs essais.');
                 }
             }
@@ -1790,6 +1787,38 @@
                     return false;
                 }
             },
+            {
+                id: 'maitre_eclair',
+                name: 'Eclairs du Maître des appels',
+                img: 'https://i.imgur.com/sKtiPmj.png',
+                description: 'Ornement exclusif pour le rang MAÎTRE DES APPELS',
+                unlock: user => getCurrentRank(user.xp).name.startsWith('Maître des appels'),
+            },
+            {
+                id: 'maitre_eclair',
+                name: 'Eclairs du Maître des appels',
+                img: 'https://i.imgur.com/sKtiPmj.png',
+                description: 'Ornement exclusif pour le rang MAÎTRE DES APPELS',
+                unlock: user => user.xp >= 23750,
+            },
+            {
+                id: 'diamant',
+                name: 'Aura du Diamant',
+                img: 'https://i.imgur.com/JLyduRZ.png',
+                description: 'Ornement exclusif pour le rang DIAMANT',
+                unlock: user => user.xp >= 12500,
+            },
+            {
+                id: 'platine',
+                name: 'Aura du Platine',
+                img: 'https://i.imgur.com/2gpOrLT.png',
+                description: 'Ornement exclusif pour le rang PLATINE',
+                minRank: 'Platine IV',
+                unlock: user => {
+                    const userRank = getCurrentRank(user.xp).name;
+                    return getRankIndex(userRank) >= getRankIndex('Platine IV');
+                }
+            },
             // D'autres badges à venir...
         ];
 
@@ -1810,6 +1839,19 @@
                 showBadgesPopup();
             };
             classementBtn.parentElement.insertAdjacentElement('afterend', btn);
+            // === AJOUTER SHOP A GAUCHE DE BADGES ===
+            if (!document.getElementById('shop-btn')) {
+                const shopBtn = btn.cloneNode(true);
+                shopBtn.id = 'shop-btn';
+                shopBtn.title = 'Boutique et Récompenses';
+                shopBtn.setAttribute('data-section', 'shop');
+                shopBtn.innerHTML = '<span>🛍️ Shop / Récompenses</span>';
+                shopBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showShopPopup();
+                };
+                btn.parentElement.insertBefore(shopBtn, btn);
+            }
         }
         addBadgesButton();
 
@@ -1848,7 +1890,8 @@
             firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
                 const unlocked = snapshot.val() || {};
                 const list = document.getElementById('badges-list');
-                list.innerHTML = allBadges.map(badge => {
+                // Affiche uniquement les badges (pas les ornements)
+                list.innerHTML = allBadges.filter(badge => typeof badge.check === 'function').map(badge => {
                     const isUnlocked = unlocked[badge.id];
                     const isHidden = badge.hidden && !isUnlocked;
                     return `<div style='background:${isUnlocked ? '#23272f' : '#181a1f'};border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:none;display:flex;flex-direction:column;align-items:center;gap:8px;opacity:${isUnlocked?1:0.5};'>
@@ -1888,12 +1931,321 @@
             });
         }
 
+        // Affichage de la popup de la boutique
+        function showShopPopup() {
+            let old = document.getElementById('shop-popup');
+            if (old) old.remove();
+            let oldBg = document.getElementById('shop-bg');
+            if (oldBg) oldBg.remove();
+            const bg = document.createElement('div');
+            bg.id = 'shop-bg';
+            bg.style.cssText = `position: fixed;top: 0; left: 0; right: 0; bottom: 0;background: rgba(0,0,0,0.35);z-index: 9999;animation: fadeInBg 0.3s;`;
+            document.body.appendChild(bg);
+            const popup = document.createElement('div');
+            popup.id = 'shop-popup';
+            popup.style.cssText = `position: fixed;top: 50%;left: 50%;transform: translate(-50%, -50%);background: rgba(34,40,49,0.93);color: #f3f6fa;border-radius: 18px;box-shadow: 0 0 32px 8px #26e0ce, 0 8px 32px rgba(0,0,0,0.18);z-index: 10000;min-width: 0;max-width: 98vw;width:95vw;max-height:90vh;overflow-y:auto;padding: 32px 8vw 24px 8vw;font-family: 'Segoe UI', Arial, sans-serif;text-align: center;animation: popupIn 0.3s;backdrop-filter: blur(6px);border: 2px solid #26e0ce44;`;
+
+            // Ajout d'un style pour masquer la scrollbar mais permettre le scroll
+            if (!document.getElementById('shop-scrollbar-style')) {
+                const style = document.createElement('style');
+                style.id = 'shop-scrollbar-style';
+                style.innerHTML = `
+                #shop-popup::-webkit-scrollbar { display: none !important; width: 0 !important; }
+                #shop-popup { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+                @media (max-width: 600px) {
+                  #shop-popup { padding: 12px 2vw 12px 2vw !important; }
+                }
+                `;
+                document.head.appendChild(style);
+            }
+
+            popup.innerHTML = `
+                <div style="font-size:2.2em;margin-bottom:18px;font-weight:bold;letter-spacing:1px;">🛍️ Shop / Récompenses</div>
+                <div style="display:flex;justify-content:center;gap:24px;margin-bottom:32px;">
+                    <button class="shop-tab-btn active" data-tab="shop" style="padding:10px 32px;font-size:1.15em;font-weight:bold;border:none;border-radius:12px;background:linear-gradient(90deg,#26e0ce,#209cff);color:#fff;box-shadow:0 2px 12px #26e0ce33,0 1px 2px #0002;transition:background 0.2s,box-shadow 0.2s,transform 0.1s;outline:none;cursor:pointer;letter-spacing:0.5px;">Boutique</button>
+                    <button class="shop-tab-btn" data-tab="rewards" style="padding:10px 32px;font-size:1.15em;font-weight:bold;border:none;border-radius:12px;background:#23272f;color:#26e0ce;box-shadow:0 2px 12px #23272f33,0 1px 2px #0002;transition:background 0.2s,box-shadow 0.2s,transform 0.1s;outline:none;cursor:pointer;letter-spacing:0.5px;">Mes Récompenses</button>
+                </div>
+                <div id="shop-content" class="shop-tab-content active">
+                    <div style="margin-bottom:24px;">
+                        <img src="https://i.imgur.com/WUkWpPb.png" alt="PoWoo Coin" style="width:32px;height:32px;vertical-align:middle;margin-right:8px;">
+                        <span style="font-size:1.2em;font-weight:bold;color:#26e0ce;" id="user-pc-balance">Chargement...</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;justify-items:center;" id="shop-items">
+                        <div id='shop-coming-soon' style='color:#26e0ce;font-size:1.7em;font-weight:bold;text-align:center;margin:64px auto 0 auto;grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:18px;'>
+                          <span style='font-size:2.5em;'>🚧</span>
+                          <span>Patience, ce n'est pas encore dispo mais promis ça arrive bientôt !</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="rewards-content" class="shop-tab-content" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;justify-items:center;max-width:900px;margin:0 auto;" id="user-rewards">
+                        <div style="color:#aaa;">Chargement des récompenses...</div>
+                    </div>
+                </div>
+                <button id="close-shop-btn" style="margin-top:22px;padding:9px 28px;border:none;border-radius:8px;background:#4caf50;color:white;font-size:1.1em;cursor:pointer;">Fermer</button>
+            `;
+            document.body.appendChild(popup);
+
+            // Ajout du style pour les boutons shop-tab-btn (effet hover, focus, actif)
+            if (!document.getElementById('shop-tab-btn-style')) {
+                const style = document.createElement('style');
+                style.id = 'shop-tab-btn-style';
+                style.innerHTML = `
+                .shop-tab-btn {
+                    padding: 12px 38px;
+                    font-size: 1.18em;
+                    font-weight: bold;
+                    border: none;
+                    border-radius: 14px;
+                    background: #23272f;
+                    color: #bfc1c2;
+                    box-shadow: 0 2px 12px #23272f33, 0 1px 2px #0002;
+                    transition: background 0.2s, box-shadow 0.2s, color 0.2s, transform 0.1s;
+                    outline: none;
+                    cursor: pointer;
+                    letter-spacing: 0.5px;
+                    margin: 0 2px;
+                }
+                .shop-tab-btn.active, .shop-tab-btn:focus {
+                    background: linear-gradient(90deg,#26e0ce,#209cff);
+                    color: #fff;
+                    box-shadow: 0 2px 16px #26e0ce55, 0 1px 2px #0002;
+                    transform: scale(1.04);
+                }
+                .shop-tab-btn:not(.active) {
+                    background: #181a1f;
+                    color: #bfc1c2;
+                    box-shadow: 0 2px 12px #181a1f33, 0 1px 2px #0002;
+                }
+                .shop-tab-btn:hover {
+                    background: linear-gradient(90deg,#209cff,#26e0ce);
+                    color: #fff;
+                    box-shadow: 0 2px 18px #209cff55, 0 1px 2px #0002;
+                    transform: scale(1.06);
+                }
+                `;
+                document.head.appendChild(style);
+            }
+
+            // Gestion des onglets
+            document.querySelectorAll('.shop-tab-btn').forEach(btn => {
+                btn.onclick = function() {
+                    document.querySelectorAll('.shop-tab-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    document.querySelectorAll('.shop-tab-content').forEach(c => c.style.display = 'none');
+                    document.getElementById(this.dataset.tab + '-content').style.display = '';
+                    // Si on clique sur Boutique, affiche le message "coming soon"
+                    if (this.dataset.tab === 'shop') {
+                        document.getElementById('shop-coming-soon').style.display = '';
+                    }
+                };
+            });
+
+            document.getElementById('close-shop-btn').onclick = () => { popup.remove(); bg.remove(); };
+            bg.onclick = () => { popup.remove(); bg.remove(); };
+
+            // Charger le solde de PC de l'utilisateur
+            const userName = getCurrentUserName();
+            firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+                const data = snapshot.val() || {};
+                const pc = data.pc || 0;
+                document.getElementById('user-pc-balance').textContent = pc + ' PC';
+            });
+
+            // === ORNEMENTS ===
+            function getRankIndex(rankName) {
+              return ranks.findIndex(r => r.name === rankName);
+            }
+            const allOrnaments = [
+              {
+                id: 'dieu_flamme',
+                name: 'Flammes du Dieu des appels',
+                img: 'https://i.imgur.com/ZdQCAkg.png',
+                description: 'Ornement exclusif pour le rang DIEU DES APPELS',
+                minRank: 'DIEU DES APPELS',
+                unlock: user => {
+                  const userRank = getCurrentRank(user.xp).name;
+                  return getRankIndex(userRank) >= getRankIndex('DIEU DES APPELS');
+                }
+              },
+              {
+                id: 'maitre_eclair',
+                name: 'Eclairs du Maître des appels',
+                img: 'https://i.imgur.com/sKtiPmj.png',
+                description: 'Ornement exclusif pour le rang MAÎTRE DES APPELS',
+                minRank: 'Maître des appels IV',
+                unlock: user => {
+                  const userRank = getCurrentRank(user.xp).name;
+                  return getRankIndex(userRank) >= getRankIndex('Maître des appels IV');
+                }
+              },
+              {
+                id: 'diamant',
+                name: 'Aura du Diamant',
+                img: 'https://i.imgur.com/JLyduRZ.png',
+                description: 'Ornement exclusif pour le rang DIAMANT',
+                minRank: 'Diamant IV',
+                unlock: user => {
+                  const userRank = getCurrentRank(user.xp).name;
+                  return getRankIndex(userRank) >= getRankIndex('Diamant IV');
+                }
+              },
+              {
+                id: 'platine',
+                name: 'Aura du Platine',
+                img: 'https://i.imgur.com/2gpOrLT.png',
+                description: 'Ornement exclusif pour le rang PLATINE',
+                minRank: 'Platine IV',
+                unlock: user => {
+                    const userRank = getCurrentRank(user.xp).name;
+                    return getRankIndex(userRank) >= getRankIndex('Platine IV');
+                }
+              },
+              // Ajoute d'autres ornements ici plus tard
+            ];
+
+            const rewardsContent = document.getElementById('user-rewards');
+            if (rewardsContent) {
+              const userName = getCurrentUserName();
+              firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+                const user = snapshot.val() || {};
+                user.xp = Number(user.xp) || 0;
+                // Ornements débloqués
+                const unlockedOrnaments = allOrnaments.filter(o => o.unlock(user));
+                // Ornement sélectionné
+                const selectedOrnament = user.selectedOrnament || null;
+                let html = '';
+                if (unlockedOrnaments.length === 0) {
+                  html = `<div style='color:#aaa;'>Aucun ornement débloqué pour le moment.</div>`;
+                } else {
+                  html = unlockedOrnaments.map(orn => `
+                    <div style='background:#23272f;border-radius:14px;padding:18px 18px 12px 18px;min-width:180px;max-width:220px;box-shadow:none;display:flex;flex-direction:column;align-items:center;gap:8px;${selectedOrnament===orn.id?'border:2px solid #26e0ce;box-shadow:0 0 16px 4px #26e0ce88;':''}'>
+                      <img src='${orn.img}' alt='${orn.name}' style='width:80px;height:80px;object-fit:contain;margin-bottom:8px;'>
+                      <div style='font-size:1.15em;font-weight:bold;color:#26e0ce;margin-bottom:2px;'>${orn.name}</div>
+                      <div style='font-size:0.98em;color:#aaa;margin-bottom:8px;'>${orn.description}</div>
+                      <button class='select-ornament-btn' data-ornament='${orn.id}' style='padding:7px 18px;border:none;border-radius:8px;background:${selectedOrnament===orn.id?'#26e0ce':'#4caf50'};color:white;font-size:1em;cursor:pointer;font-weight:bold;'>${selectedOrnament===orn.id?'Sélectionné':'Sélectionner'}</button>
+                    </div>
+                  `).join('');
+                }
+                rewardsContent.innerHTML = html;
+                // Ajout listeners
+                rewardsContent.querySelectorAll('.select-ornament-btn').forEach(btn => {
+                  btn.onclick = function() {
+                    const ornId = this.getAttribute('data-ornament');
+                    firebase.database().ref('users/' + encodeURIComponent(userName)).update({ selectedOrnament: ornId }).then(() => {
+                      showShopPopup(); // refresh
+                    });
+                  };
+                });
+              });
+            }
+        }
+
+        // Fonction pour attribuer des PoWoo Coins
+        function awardPCToUser(userName, amount, reason, isRankUp) {
+            const userRef = firebase.database().ref('users/' + encodeURIComponent(userName));
+            userRef.once('value').then(snapshot => {
+                const data = snapshot.val();
+                const currentPC = data.pc || 0;
+                const newPC = currentPC + amount;
+                userRef.update({ pc: newPC }).then(() => {
+                    if (isRankUp) {
+                        showPCRankUpNotification(amount);
+                    } else {
+                        showPCGainNotification(amount);
+                    }
+                });
+            });
+        }
+
+        // Notification d'obtention de PC
+        function showPCGainNotification(amount) {
+            let notification = document.getElementById('pc-gain-notification');
+            if (notification) notification.remove();
+
+            notification = document.createElement('div');
+            notification.id = 'pc-gain-notification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 90px;
+                left: calc(50% - 160px);
+                transform: translateX(-50%);
+                background: rgba(34, 40, 49, 0.95);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: bold;
+                font-size: 1.1em;
+                z-index: 9999;
+                box-shadow: 0 0 20px rgba(38, 224, 206, 0.5);
+                animation: pcGainAnimation 2s forwards;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            `;
+
+            notification.innerHTML = `
+                <span style="font-size: 1.2em;">✨</span>
+                <span>+${amount} PC</span>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Supprime la notification après l'animation
+            setTimeout(() => {
+                notification.remove();
+            }, 2000);
+        }
+
+        // Ajout de l'animation pour la notification PC
+        if (!document.getElementById('pc-animations')) {
+            const style = document.createElement('style');
+            style.id = 'pc-animations';
+            style.innerHTML = `
+                @keyframes pcGainAnimation {
+                    0% {
+                        opacity: 0;
+                        transform: translate(-50%, 20px);
+                    }
+                    20% {
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                    80% {
+                        opacity: 1;
+                        transform: translate(-50%, 0);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translate(-50%, -20px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Modification de la fonction awardXPToUser pour inclure les PC
+        const originalAwardXPToUser = awardXPToUser;
+        awardXPToUser = function(userName, amount, typeCloture = 'normal') {
+            originalAwardXPToUser(userName, amount, typeCloture);
+
+            // Vérifier si l'utilisateur a atteint 50 appels pour attribuer des PC
+            firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(snapshot => {
+                const logs = snapshot.val() ? Object.values(snapshot.val()) : [];
+                if (logs.length >= 50) {
+                    awardPCToUser(userName, 10);
+                }
+            });
+        };
+
         // Vérification des badges à chaque cloture
         function checkAndUnlockBadges(userName, logs) {
             firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
                 const unlocked = snapshot.val() || {};
                 allBadges.forEach(badge => {
-                    if (!unlocked[badge.id] && badge.check(logs)) {
+                    if (typeof badge.check === 'function' && !unlocked[badge.id] && badge.check(logs)) {
                         // Débloque le badge
                         firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
                         // Attribue 100 XP pour l'obtention du badge
@@ -1901,7 +2253,7 @@
                         showBadgeUnlockedNotification(badge);
                     }
                 });
-        });
+            });
         }
 
         // Notification animée de badge débloqué
@@ -1940,5 +2292,629 @@
             @media (max-width: 700px) { #stats-popup { padding: 18px 4vw 18px 4vw !important; } }`;
             document.head.appendChild(style);
         }
+
+        // --- LOGIQUE PoWoo Coin (PC) ---
+        // Attribuer +10 PC lors d'un passage de grade (rank up)
+        let lastRankName = null;
+        function checkAndAwardPCForRankUp(userName, newRankName) {
+            if (!lastRankName) {
+                lastRankName = localStorage.getItem('gamif_last_rank_' + userName) || '';
+            }
+            if (lastRankName !== newRankName) {
+                awardPCToUser(userName, 10, 'rankup', true); // true = rankup
+                lastRankName = newRankName;
+                localStorage.setItem('gamif_last_rank_' + userName, newRankName);
+            }
+        }
+        // Attribuer +10 PC à chaque palier de 50 appels clôturés (50, 100, 150...)
+        function checkAndAwardPCForClotures(userName, logs) {
+            const count = logs.length;
+            const lastPCMilestone = parseInt(localStorage.getItem('gamif_last_pc_milestone_' + userName) || '0', 10);
+            const milestone = Math.floor(count / 50) * 50;
+            if (milestone > 0 && milestone !== lastPCMilestone) {
+                awardPCToUser(userName, 10, 'cloture50');
+                localStorage.setItem('gamif_last_pc_milestone_' + userName, milestone);
+            }
+        }
+        // Surcharge de updateUI pour détecter le rank up et attribuer les PC
+        const originalUpdateUI = updateUI;
+        updateUI = function(userData) {
+            originalUpdateUI(userData);
+            const userName = getCurrentUserName();
+            const currentRank = getCurrentRank(userData.xp);
+            checkAndAwardPCForRankUp(userName, currentRank.name);
+        };
+        // Ajout d'un hook sur la cloture pour les PC (sans toucher à l'XP)
+        awardXPToUser = function(userName, amount, typeCloture = 'normal') {
+            originalAwardXPToUser(userName, amount, typeCloture);
+            // Vérifier les paliers de 50 appels
+            firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(snapshot => {
+                const logs = snapshot.val() ? Object.values(snapshot.val()) : [];
+                checkAndAwardPCForClotures(userName, logs);
+            });
+        };
+        // --- Notification PC qui part du bouton Shop ---
+        function showPCGainNotification(amount) {
+            let notification = document.getElementById('pc-gain-notification');
+            if (notification) notification.remove();
+            // Trouver le bouton Shop
+            const shopBtn = document.getElementById('shop-btn');
+            if (!shopBtn) return;
+            const rect = shopBtn.getBoundingClientRect();
+            notification = document.createElement('div');
+            notification.id = 'pc-gain-notification';
+            notification.style.cssText = `
+                position: fixed;
+                left: ${rect.left + rect.width/2}px;
+                top: ${rect.top + rect.height/2}px;
+                transform: translate(-50%, 0);
+                background: rgba(38, 224, 206, 0.95);
+                color: white;
+                padding: 8px 16px;
+                border-radius: 20px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: bold;
+                font-size: 1.1em;
+                z-index: 9999;
+                box-shadow: 0 0 20px rgba(38, 224, 206, 0.5);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                pointer-events: none;
+                animation: pcShopGainAnim 3s forwards;
+            `;
+            notification.innerHTML = `
+                <img src="https://i.imgur.com/WUkWpPb.png" alt="PoWoo Coin" style="width:24px;height:24px;">
+                <span>+${amount} PC</span>
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        if (!document.getElementById('pc-shop-animations')) {
+            const style = document.createElement('style');
+            style.id = 'pc-shop-animations';
+            style.innerHTML = `
+                @keyframes pcShopGainAnim {
+                    0% {
+                        opacity: 0;
+                        transform: translate(-50%, 20px) scale(0.7);
+                    }
+                    10% {
+                        opacity: 1;
+                        transform: translate(-50%, 0) scale(1.1);
+                    }
+                    80% {
+                        opacity: 1;
+                        transform: translate(-50%, -30px) scale(1);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translate(-50%, -60px) scale(0.7);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        if (!document.getElementById('pc-rankup-animations')) {
+            const style = document.createElement('style');
+            style.id = 'pc-rankup-animations';
+            style.innerHTML = `
+                @keyframes pcRankUpAnimBig {
+                    0% {
+                        opacity: 0;
+                        transform: translate(-50%, -40px) scale(0.7);
+                        filter: blur(12px);
+                    }
+                    10% {
+                        opacity: 1;
+                        transform: translate(-50%, 0) scale(1.1);
+                        filter: blur(0px);
+                    }
+                    40% {
+                        opacity: 1;
+                        transform: translate(-50%, 220px) scale(1.08);
+                        filter: blur(0px);
+                    }
+                    80% {
+                        opacity: 1;
+                        transform: translate(-50%, 0) scale(1);
+                        filter: blur(0px);
+                    }
+                    100% {
+                        opacity: 0;
+                        transform: translate(-50%, 0) scale(0.7);
+                        filter: blur(12px);
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        // ... existing code ...
+
+        function showPCRankUpNotification(amount) {
+            let notification = document.getElementById('pc-rankup-notification');
+            if (notification) notification.remove();
+            // Trouver le bouton Shop
+            const shopBtn = document.getElementById('shop-btn');
+            if (!shopBtn) return;
+            const rect = shopBtn.getBoundingClientRect();
+            // Position de base : pile en bas du bouton Shop
+            const baseOffset = rect.bottom + 6;
+            // Décalage de descente réduit à 1.5cm (15px)
+            const deepOffset = baseOffset + 15;
+            // Décalage de remontée augmenté à 3cm (30px) au-dessus de la base
+            const upOffset = baseOffset - 30;
+            notification = document.createElement('div');
+            notification.id = 'pc-rankup-notification';
+            notification.style.cssText = `
+                position: fixed;
+                left: ${rect.left + rect.width/2}px;
+                top: 0;
+                transform: translate(-50%, ${baseOffset}px);
+                background: linear-gradient(90deg, #26e0ce 0%, #209cff 100%); // stops serrés, bords nets
+                color: #fff;
+                padding: 4px 16px;
+                border-radius: 16px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-weight: bold;
+                font-size: 0.98em;
+                z-index: 10001;
+                box-shadow: none;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                pointer-events: none;
+                text-shadow: 0 1px 4px #000a, 0 0 6px #26e0cecc;
+                filter: drop-shadow(0 0 16px #26e0ce) drop-shadow(0 0 32px #209cff88);
+            `;
+            notification.innerHTML = `
+                <img src="https://i.imgur.com/WUkWpPb.png" alt="PoWoo Coin" style="width:32px;height:32px;filter:drop-shadow(0 0 8px #fff) drop-shadow(0 0 16px #26e0ce);border-radius:50%;background:#fff2;">
+                <span style="font-size:1em;font-weight:bold;text-shadow:0 1px 6px #000,0 0 2px #000,0 0 1px #000;">+${amount} PoWoo Coin</span>
+            `;
+            document.body.appendChild(notification);
+            // Animation : descend de 1.5cm, attend, puis remonte de 3cm au-dessus de la base, le tout lentement (7s)
+            notification.animate([
+                { opacity: 0, transform: `translate(-50%, ${baseOffset}px) scale(0.7)`, filter: 'blur(8px)' },
+                { opacity: 1, transform: `translate(-50%, ${deepOffset}px) scale(1.12)`, filter: 'blur(0px)' },
+                { opacity: 1, transform: `translate(-50%, ${deepOffset}px) scale(1.12)`, filter: 'blur(0px)' },
+                { offset: 0.6, opacity: 1, transform: `translate(-50%, ${deepOffset}px) scale(1.12)`, filter: 'blur(0px)' },
+                { offset: 0.8, opacity: 1, transform: `translate(-50%, ${upOffset}px) scale(1)`, filter: 'blur(0px)' },
+                { opacity: 0, transform: `translate(-50%, ${upOffset}px) scale(0.7)`, filter: 'blur(8px)' }
+            ], {
+                duration: 7000,
+                easing: 'cubic-bezier(.4,1.4,.6,1)',
+                fill: 'forwards'
+            });
+            setTimeout(() => {
+                notification.remove();
+            }, 7000);
+        }
+
+        // === Ornement flammes dans la colonne Assigné à ===
+        function applyOrnamentToAssigneeColumn() {
+          document.querySelectorAll('.o_data_cell[name="user_id"]').forEach(cell => {
+            const nameSpan = cell.querySelector('span, div, a') || cell;
+            if (!nameSpan) return;
+            const userName = nameSpan.textContent.trim();
+            if (!userName) return;
+            if (cell.classList.contains('ornament-applied')) return;
+            cell.classList.add('ornament-applied');
+            firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snapshot => {
+              const user = snapshot.val() || {};
+              if (user.selectedOrnament === 'dieu_flamme') {
+                // Crée le conteneur principal (pour positionner le gif autour de tout)
+                const mainWrapper = document.createElement('span');
+                mainWrapper.style.position = 'relative';
+                mainWrapper.style.display = 'inline-flex';
+                mainWrapper.style.alignItems = 'center';
+                mainWrapper.style.justifyContent = 'flex-start';
+                mainWrapper.style.width = '160px';
+                mainWrapper.style.height = '56px';
+                // Ajoute le GIF de flammes animé en fond
+                const flamesBg = document.createElement('img');
+                flamesBg.src = 'https://cdn.pixabay.com/animation/2024/05/07/23/55/23-55-47-279_256.gif';
+                flamesBg.alt = 'Flammes animées';
+                flamesBg.style.position = 'absolute';
+                flamesBg.style.left = '0';
+                flamesBg.style.top = '50%';
+                flamesBg.style.transform = 'translateY(-50%)';
+                flamesBg.style.width = '100%';
+                flamesBg.style.height = '100%';
+                flamesBg.style.pointerEvents = 'none';
+                flamesBg.style.zIndex = '0';
+                flamesBg.style.opacity = '0.7';
+                // Conteneur ornement + photo
+                const wrapper = document.createElement('span');
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'inline-block';
+                wrapper.style.width = '56px';
+                wrapper.style.height = '56px';
+                wrapper.style.verticalAlign = 'middle';
+                // Ajoute l'ornement PNG
+                const flames = document.createElement('img');
+                flames.src = 'https://i.imgur.com/ZdQCAkg.png';
+                flames.alt = 'Ornement Dieu des appels';
+                flames.style.position = 'absolute';
+                flames.style.left = '50%';
+                flames.style.top = '43%';
+                flames.style.transform = 'translate(-50%,-50%)';
+                flames.style.width = '56px';
+                flames.style.height = '56px';
+                flames.style.pointerEvents = 'none';
+                flames.style.zIndex = '1';
+                // Cherche la photo de profil Odoo
+                let avatarImg = cell.querySelector('img');
+                let avatar;
+                if (avatarImg && avatarImg.src) {
+                  avatar = document.createElement('img');
+                  avatar.src = avatarImg.src;
+                  avatar.alt = userName;
+                  avatar.style.width = '26px';
+                  avatar.style.height = '26px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.objectFit = 'cover';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '46%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.border = '2px solid #fff8';
+                  avatar.style.background = '#23272f';
+                } else {
+                  avatar = document.createElement('span');
+                  avatar.style.display = 'flex';
+                  avatar.style.alignItems = 'center';
+                  avatar.style.justifyContent = 'center';
+                  avatar.style.width = '26px';
+                  avatar.style.height = '26px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.background = '#23272f';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '46%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.fontWeight = 'bold';
+                  avatar.style.fontSize = '1.1em';
+                  avatar.style.color = '#fff';
+                  avatar.textContent = userName[0] || '';
+                }
+                wrapper.appendChild(flames);
+                wrapper.appendChild(avatar);
+                // Effet flammes sur le nom
+                const nameFlame = document.createElement('span');
+                nameFlame.textContent = ' ' + userName;
+                nameFlame.className = 'flame-name';
+                nameFlame.style.fontWeight = 'bold';
+                nameFlame.style.fontSize = '1.08em';
+                nameFlame.style.position = 'relative';
+                nameFlame.style.background = 'linear-gradient(90deg,#ff9800,#ffd700,#fff,#ffd700,#ff9800)';
+                nameFlame.style.backgroundSize = '200% 100%';
+                nameFlame.style.backgroundClip = 'text';
+                nameFlame.style.webkitBackgroundClip = 'text';
+                nameFlame.style.color = 'transparent';
+                nameFlame.style.webkitTextFillColor = 'transparent';
+                nameFlame.style.animation = 'flameTextAnim 2s linear infinite alternate';
+                nameFlame.style.textShadow = '0 0 16px #ff9800,0 0 32px #ffd700,0 0 12px #fff';
+                // Construction finale
+                mainWrapper.appendChild(flamesBg);
+                mainWrapper.appendChild(wrapper);
+                mainWrapper.appendChild(nameFlame);
+                cell.innerHTML = '';
+                cell.appendChild(mainWrapper);
+              }
+              // === MAITRE DES APPELS (éclair) ===
+              if (user.selectedOrnament === 'maitre_eclair') {
+                // Conteneur principal
+                const mainWrapper = document.createElement('span');
+                mainWrapper.style.position = 'relative';
+                mainWrapper.style.display = 'inline-flex';
+                mainWrapper.style.alignItems = 'center';
+                mainWrapper.style.justifyContent = 'flex-start';
+                mainWrapper.style.width = '160px';
+                mainWrapper.style.height = '56px';
+                // GIF d'éclair violet en fond
+                const thunderBg = document.createElement('img');
+                thunderBg.src = 'https://cdn.pixabay.com/animation/2025/01/22/22/52/22-52-40-118_256.gif';
+                thunderBg.alt = 'Eclair animé';
+                thunderBg.style.position = 'absolute';
+                thunderBg.style.left = '0';
+                thunderBg.style.top = '50%';
+                thunderBg.style.transform = 'translateY(-50%)';
+                thunderBg.style.width = '100%';
+                thunderBg.style.height = '100%';
+                thunderBg.style.pointerEvents = 'none';
+                thunderBg.style.zIndex = '0';
+                thunderBg.style.opacity = '0.7';
+                // Ornement PNG autour de la photo
+                const wrapper = document.createElement('span');
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'inline-block';
+                wrapper.style.width = '56px';
+                wrapper.style.height = '56px';
+                wrapper.style.verticalAlign = 'middle';
+                const thunderOrn = document.createElement('img');
+                thunderOrn.src = 'https://i.imgur.com/sKtiPmj.png';
+                thunderOrn.alt = 'Ornement Maître des appels';
+                thunderOrn.style.position = 'absolute';
+                thunderOrn.style.left = '50%';
+                thunderOrn.style.top = '43%';
+                thunderOrn.style.transform = 'translate(-50%,-50%)';
+                thunderOrn.style.width = '56px';
+                thunderOrn.style.height = '56px';
+                thunderOrn.style.pointerEvents = 'none';
+                thunderOrn.style.zIndex = '1';
+                // Photo de profil centrée
+                let avatarImg = cell.querySelector('img');
+                let avatar;
+                if (avatarImg && avatarImg.src) {
+                  avatar = document.createElement('img');
+                  avatar.src = avatarImg.src;
+                  avatar.alt = userName;
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.objectFit = 'cover';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.border = '2px solid #fff8';
+                  avatar.style.background = '#23272f';
+                } else {
+                  avatar = document.createElement('span');
+                  avatar.style.display = 'flex';
+                  avatar.style.alignItems = 'center';
+                  avatar.style.justifyContent = 'center';
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.background = '#23272f';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.fontWeight = 'bold';
+                  avatar.style.fontSize = '1.1em';
+                  avatar.style.color = '#fff';
+                  avatar.textContent = userName[0] || '';
+                }
+                wrapper.appendChild(thunderOrn);
+                wrapper.appendChild(avatar);
+                // Effet éclair violet sur le nom
+                const nameThunder = document.createElement('span');
+                nameThunder.textContent = ' ' + userName;
+                nameThunder.className = 'thunder-name';
+                nameThunder.style.fontWeight = 'bold';
+                nameThunder.style.fontSize = '1.08em';
+                nameThunder.style.position = 'relative';
+                nameThunder.style.background = 'linear-gradient(90deg,#8f00ff,#00eaff,#fff,#00eaff,#8f00ff)';
+                nameThunder.style.backgroundSize = '200% 100%';
+                nameThunder.style.backgroundClip = 'text';
+                nameThunder.style.webkitBackgroundClip = 'text';
+                nameThunder.style.color = 'transparent';
+                nameThunder.style.webkitTextFillColor = 'transparent';
+                nameThunder.style.animation = 'thunderTextAnim 2s linear infinite alternate';
+                nameThunder.style.textShadow = '0 0 16px #8f00ff,0 0 32px #00eaff,0 0 12px #fff';
+                // Construction finale
+                mainWrapper.appendChild(thunderBg);
+                mainWrapper.appendChild(wrapper);
+                mainWrapper.appendChild(nameThunder);
+                cell.innerHTML = '';
+                cell.appendChild(mainWrapper);
+              }
+              if (user.selectedOrnament === 'diamant') {
+                // Conteneur principal
+                const mainWrapper = document.createElement('span');
+                mainWrapper.style.position = 'relative';
+                mainWrapper.style.display = 'inline-flex';
+                mainWrapper.style.alignItems = 'center';
+                mainWrapper.style.justifyContent = 'flex-start';
+                mainWrapper.style.width = '160px';
+                mainWrapper.style.height = '56px';
+                // Ornement PNG autour de la photo
+                const wrapper = document.createElement('span');
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'inline-block';
+                wrapper.style.width = '56px';
+                wrapper.style.height = '56px';
+                wrapper.style.verticalAlign = 'middle';
+                const diamondOrn = document.createElement('img');
+                diamondOrn.src = 'https://i.imgur.com/JLyduRZ.png';
+                diamondOrn.alt = 'Ornement Diamant';
+                diamondOrn.style.position = 'absolute';
+                diamondOrn.style.left = '50%';
+                diamondOrn.style.top = '43%';
+                diamondOrn.style.transform = 'translate(-50%,-50%)';
+                diamondOrn.style.width = '56px';
+                diamondOrn.style.height = '56px';
+                diamondOrn.style.pointerEvents = 'none';
+                diamondOrn.style.zIndex = '1';
+                // Photo de profil centrée
+                let avatarImg = cell.querySelector('img');
+                let avatar;
+                if (avatarImg && avatarImg.src) {
+                  avatar = document.createElement('img');
+                  avatar.src = avatarImg.src;
+                  avatar.alt = userName;
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.objectFit = 'cover';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.border = '2px solid #fff8';
+                  avatar.style.background = '#23272f';
+                } else {
+                  avatar = document.createElement('span');
+                  avatar.style.display = 'flex';
+                  avatar.style.alignItems = 'center';
+                  avatar.style.justifyContent = 'center';
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.background = '#23272f';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.fontWeight = 'bold';
+                  avatar.style.fontSize = '1.1em';
+                  avatar.style.color = '#fff';
+                  avatar.textContent = userName[0] || '';
+                }
+                wrapper.appendChild(diamondOrn);
+                wrapper.appendChild(avatar);
+                // Effet texte bleu scintillant
+                const nameDiamond = document.createElement('span');
+                nameDiamond.textContent = ' ' + userName;
+                nameDiamond.className = 'diamond-name';
+                nameDiamond.style.fontWeight = 'bold';
+                nameDiamond.style.fontSize = '1.08em';
+                nameDiamond.style.position = 'relative';
+                nameDiamond.style.background = 'linear-gradient(90deg,#00eaff,#00bfff,#fff,#00bfff,#00eaff)';
+                nameDiamond.style.backgroundSize = '200% 100%';
+                nameDiamond.style.backgroundClip = 'text';
+                nameDiamond.style.webkitBackgroundClip = 'text';
+                nameDiamond.style.color = 'transparent';
+                nameDiamond.style.webkitTextFillColor = 'transparent';
+                nameDiamond.style.animation = 'diamondTextAnim 2s linear infinite alternate';
+                nameDiamond.style.textShadow = '0 0 12px #00eaff,0 0 24px #00bfff,0 0 8px #fff';
+                nameDiamond.style.marginLeft = '10px';
+                // Ajoute le GIF diamant à droite du texte
+                const sparkle = document.createElement('img');
+                sparkle.src = 'https://cdn.pixabay.com/animation/2024/02/22/14/55/14-55-54-406_256.gif';
+                sparkle.alt = 'Diamant animé';
+                sparkle.style.display = 'inline-block';
+                sparkle.style.width = '32px';
+                sparkle.style.height = '32px';
+                sparkle.style.marginLeft = '2px';
+                sparkle.style.verticalAlign = 'middle';
+                sparkle.style.opacity = '0.85';
+                nameDiamond.appendChild(sparkle);
+                // Construction finale
+                mainWrapper.appendChild(wrapper);
+                mainWrapper.appendChild(nameDiamond);
+                cell.innerHTML = '';
+                cell.appendChild(mainWrapper);
+              }
+              if (user.selectedOrnament === 'platine') {
+                // Conteneur principal
+                const mainWrapper = document.createElement('span');
+                mainWrapper.style.position = 'relative';
+                mainWrapper.style.display = 'inline-flex';
+                mainWrapper.style.alignItems = 'center';
+                mainWrapper.style.justifyContent = 'flex-start';
+                mainWrapper.style.width = '160px';
+                mainWrapper.style.height = '56px';
+                // Ornement PNG autour de la photo
+                const wrapper = document.createElement('span');
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'inline-block';
+                wrapper.style.width = '56px';
+                wrapper.style.height = '56px';
+                wrapper.style.verticalAlign = 'middle';
+                const platineOrn = document.createElement('img');
+                platineOrn.src = 'https://i.imgur.com/2gpOrLT.png';
+                platineOrn.alt = 'Ornement Platine';
+                platineOrn.style.position = 'absolute';
+                platineOrn.style.left = '50%';
+                platineOrn.style.top = '43%';
+                platineOrn.style.transform = 'translate(-50%,-50%)';
+                platineOrn.style.width = '56px';
+                platineOrn.style.height = '56px';
+                platineOrn.style.pointerEvents = 'none';
+                platineOrn.style.zIndex = '1';
+                // Photo de profil centrée
+                let avatarImg = cell.querySelector('img');
+                let avatar;
+                if (avatarImg && avatarImg.src) {
+                  avatar = document.createElement('img');
+                  avatar.src = avatarImg.src;
+                  avatar.alt = userName;
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.objectFit = 'cover';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.border = '2px solid #fff8';
+                  avatar.style.background = '#23272f';
+                } else {
+                  avatar = document.createElement('span');
+                  avatar.style.display = 'flex';
+                  avatar.style.alignItems = 'center';
+                  avatar.style.justifyContent = 'center';
+                  avatar.style.width = '30px';
+                  avatar.style.height = '30px';
+                  avatar.style.borderRadius = '50%';
+                  avatar.style.background = '#23272f';
+                  avatar.style.position = 'absolute';
+                  avatar.style.left = '50%';
+                  avatar.style.top = '49%';
+                  avatar.style.transform = 'translate(-50%,-50%)';
+                  avatar.style.zIndex = '2';
+                  avatar.style.fontWeight = 'bold';
+                  avatar.style.fontSize = '1.1em';
+                  avatar.style.color = '#fff';
+                  avatar.textContent = userName[0] || '';
+                }
+                wrapper.appendChild(platineOrn);
+                wrapper.appendChild(avatar);
+                // Effet texte bleu ciel glow
+                const namePlatine = document.createElement('span');
+                namePlatine.textContent = ' ' + userName;
+                namePlatine.className = 'platine-name';
+                namePlatine.style.fontWeight = 'bold';
+                namePlatine.style.fontSize = '1.08em';
+                namePlatine.style.position = 'relative';
+                namePlatine.style.color = '#7ed6df';
+                namePlatine.style.textShadow = '0 0 8px #7ed6df, 0 0 16px #fff';
+                namePlatine.style.marginLeft = '10px';
+                // Construction finale
+                mainWrapper.appendChild(wrapper);
+                mainWrapper.appendChild(namePlatine);
+                cell.innerHTML = '';
+                cell.appendChild(mainWrapper);
+              }
+            });
+          });
+        }
+        // Ajoute l'animation CSS globale une seule fois
+        if (!document.getElementById('flame-anim-style')) {
+          const style = document.createElement('style');
+          style.id = 'flame-anim-style';
+          style.innerHTML = `@keyframes flameTextAnim {0%{background-position:0% 50%;}100%{background-position:100% 50%;}}`;
+          document.head.appendChild(style);
+        }
+        // Observe le DOM pour appliquer dynamiquement l'effet
+        const assigneeObserver = new MutationObserver(applyOrnamentToAssigneeColumn);
+        assigneeObserver.observe(document.body, { childList: true, subtree: true });
+        // Appel initial
+        applyOrnamentToAssigneeColumn();
+        // Ajoute l'animation CSS pour le texte éclair si pas déjà présent
+        if (!document.getElementById('thunder-anim-style')) {
+          const style = document.createElement('style');
+          style.id = 'thunder-anim-style';
+          style.innerHTML = `@keyframes thunderTextAnim {0%{background-position:0% 50%;}100%{background-position:100% 50%;}}`;
+          document.head.appendChild(style);
+        }
+        if (!document.getElementById('diamond-anim-style')) {
+          const style = document.createElement('style');
+          style.id = 'diamond-anim-style';
+          style.innerHTML = `@keyframes diamondTextAnim {0%{background-position:0% 50%;}100%{background-position:100% 50%;}}`;
+          document.head.appendChild(style);
+        }
     }
-})(); 
+})();

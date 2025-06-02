@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification System
 // @namespace    http://tampermonkey.net/
-// @version      0.2.4
+// @version      0.2.5
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -196,6 +196,7 @@
                 flex-direction: column;
                 align-items: center;
                 animation: glowing 2s infinite alternate;
+                margin-left: 1.8cm;
             `;
             gamificationUI.style.display = 'none';
             let controls = `
@@ -1162,7 +1163,7 @@
             if (best.length > 0) return best;
             return 'Utilisateur inconnu';
         }
-        function awardXPToUser(userName, amount, typeCloture = 'normal') {
+        function awardXPToUser(userName, amount, typeCloture = 'normal', duree = 0) {
             const userRef = firebase.database().ref('users/' + encodeURIComponent(userName));
             userRef.once('value').then(snapshot => {
                 const data = snapshot.val();
@@ -1184,25 +1185,15 @@
                 const timeStr = now.toTimeString().slice(0,5); // HH:mm
                 const clotureRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures/' + dateStr + '/' + typeCloture);
                 clotureRef.transaction(current => (current || 0) + 1);
-                // Enregistrement du log détaillé (date + heure + type)
+                // Enregistrement du log détaillé (date + heure + type + duree)
                 const logRef = firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log');
-                logRef.push({ date: dateStr, time: timeStr, type: typeCloture }).then(() => {
-                    // Après avoir ajouté le log, relire tous les logs pour les badges
-                    firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(logSnap => {
-                        const logs = logSnap.val() ? Object.values(logSnap.val()) : [];
-                        firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
-                            const unlocked = snapshot.val() || {};
-                            allBadges.forEach(badge => {
-                                if (typeof badge.check === 'function' && !unlocked[badge.id] && badge.check(logs)) {
-                                    // Débloque le badge
-                                    firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
-                                    // Attribue 100 XP pour l'obtention du badge
-                                    awardXPToUser(userName, 100, 'badge');
-                                    showBadgeUnlockedNotification(badge);
-                                }
-                            });
+                logRef.push({ date: dateStr, time: timeStr, type: typeCloture, duree: duree })
+                    .then(() => {
+                        // Récupérer tous les logs pour vérifier les badges
+                        logRef.once('value').then(snapshot => {
+                            const logs = snapshot.val() ? Object.values(snapshot.val()) : [];
+                            checkAndUnlockBadges(userName, logs);
                         });
-                    });
                     });
             }).catch(err => {
                 console.error('[Gamification] Erreur lors de la lecture Firebase :', err);
@@ -1249,6 +1240,9 @@
             }, 2000);
         }
         function setupCloturerDetection() {
+            // Map pour stocker les tickets en cours de clôture
+            const processingTickets = new Map();
+
             function addListeners() {
                 document.querySelectorAll('button, a').forEach(btn => {
                     if (btn.dataset.gamifCloturer) return;
@@ -1256,6 +1250,20 @@
                         btn.dataset.gamifCloturer = '1';
                         btn.addEventListener('click', function() {
                             console.log('[Gamification] Clic sur bouton Clôturer détecté');
+                            
+                            // Récupérer l'ID du ticket
+                            const ticketId = window.location.pathname.split('/').pop();
+                            if (!ticketId) return;
+
+                            // Vérifier si le ticket est déjà en cours de traitement
+                            if (processingTickets.has(ticketId)) {
+                                console.log('[Gamification] Ticket déjà en cours de traitement');
+                                return;
+                            }
+
+                            // Marquer le ticket comme en cours de traitement
+                            processingTickets.set(ticketId, true);
+
                             setTimeout(() => {
                                 // Vérifie si le bouton est désactivé ou si le ticket est passé à l'état clôturé
                                 const isDisabled = btn.disabled || btn.classList.contains('disabled') || btn.getAttribute('disabled') !== null;
@@ -1284,37 +1292,55 @@
                                         else if (nbEtoiles === 3) { xp = 200; typeCloture = 'bloquant'; }
                                         else { xp = 100; typeCloture = 'normal'; }
                                         console.log('[Gamification] Priorité détectée :', nbEtoiles, 'étoiles, XP =', xp, ', type =', typeCloture);
-            } else {
-                                        // Fallback couleur si jamais la priorité n'est pas trouvée
-                                        let titreElem = document.querySelector('.o_form_view input[name="name"], .o_form_view .o_field_widget.o_field_char, .o_form_view h1, .o_form_view .o_form_label');
-                                        let color = '';
-                                        if (titreElem) {
-                                            let el = titreElem;
-                                            while (el && el.classList && !el.classList.contains('o_form_view')) {
-                                                color = window.getComputedStyle(el).color;
-                                                if (color && color !== 'rgb(234, 234, 234)' && color !== 'rgb(0, 0, 0)' && color !== 'rgb(255, 255, 255)') break;
-                                                el = el.parentElement;
-                                            }
-                                            if (!color) color = window.getComputedStyle(titreElem).color;
-                                            console.log('[Gamification] Couleur du titre détectée (robuste) :', color);
-                                            let r, g, b;
-                                            const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/);
-                                            if (match) {
-                                                r = parseInt(match[1]);
-                                                g = parseInt(match[2]);
-                                                b = parseInt(match[3]);
-                                                if (r > 200 && g < 100 && b < 100) { xp = 180; typeCloture = 'important'; }
-                                                else if (r > 200 && g > 100 && b < 100) { xp = 140; typeCloture = 'urgent'; }
-                                                else if (g > 150 && r < 100 && b < 100) { xp = 120; typeCloture = 'bloquant'; }
-                                            }
+                                    }
+                                    // Fallback couleur si jamais la priorité n'est pas trouvée
+                                    let titreElem = document.querySelector('.o_form_view input[name="name"], .o_form_view .o_field_widget.o_field_char, .o_form_view h1, .o_form_view .o_form_label');
+                                    let color = '';
+                                    if (titreElem) {
+                                        let el = titreElem;
+                                        while (el && el.classList && !el.classList.contains('o_form_view')) {
+                                            color = window.getComputedStyle(el).color;
+                                            if (color && color !== 'rgb(234, 234, 234)' && color !== 'rgb(0, 0, 0)' && color !== 'rgb(255, 255, 255)') break;
+                                            el = el.parentElement;
+                                        }
+                                        if (!color) color = window.getComputedStyle(titreElem).color;
+                                        console.log('[Gamification] Couleur du titre détectée (robuste) :', color);
+                                        let r, g, b;
+                                        const match = color.match(/rgb\((\d+), (\d+), (\d+)\)/);
+                                        if (match) {
+                                            r = parseInt(match[1]);
+                                            g = parseInt(match[2]);
+                                            b = parseInt(match[3]);
+                                            if (r > 200 && g < 100 && b < 100) { xp = 180; typeCloture = 'important'; }
+                                            else if (r > 200 && g > 100 && b < 100) { xp = 140; typeCloture = 'urgent'; }
+                                            else if (g > 150 && r < 100 && b < 100) { xp = 120; typeCloture = 'bloquant'; }
                                         }
                                     }
                                     console.log('[Gamification] Nom utilisateur détecté :', userName);
                                     console.log('[Gamification] Attribution de', xp, 'XP à', userName, 'Type:', typeCloture);
-                                    awardXPToUser(userName, xp, typeCloture);
+                                    // === NOUVEAU : récupération de la durée du timer ===
+                                    let duree = 0;
+                                    let timerElem = document.querySelector('span[name="timer_start"]');
+                                    if (!timerElem) {
+                                        timerElem = Array.from(document.querySelectorAll('.o_form_view *')).find(el => /\d{1,2}:\d{2}(:\d{2})?/.test(el.textContent));
+                                    }
+                                    if (timerElem) {
+                                        const match = timerElem.textContent.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+                                        if (match) {
+                                            const h = match[3] ? parseInt(match[1], 10) : 0;
+                                            const m = match[3] ? parseInt(match[2], 10) : parseInt(match[1], 10);
+                                            const s = match[3] ? parseInt(match[3], 10) : parseInt(match[2], 10);
+                                            duree = h * 60 + m + (s >= 30 ? 1 : 0); // arrondi à la minute supérieure si >30s
+                                        }
+                                    }
+                                    console.log('[Gamification] Durée détectée (minutes) :', duree);
+                                    awardXPToUser(userName, xp, typeCloture, duree);
                                 } else {
                                     console.log('[Gamification] Condition non remplie : XP non attribuée');
                                 }
+
+                                // Retirer le ticket de la liste des tickets en cours de traitement
+                                processingTickets.delete(ticketId);
                             }, 1200);
                         });
                     }
@@ -1587,9 +1613,7 @@
                 description: 'Clôturer 5 tickets en une seule journée',
                 img: 'https://i.imgur.com/xYip92S.png',
                 check: function(logs) {
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    return Object.values(byDay).some(v => v >= 5);
+                    return logs.length >= 5;
                 }
             },
             {
@@ -1599,9 +1623,7 @@
                 description: 'Clôturer plus de 61 tickets en une seule journée',
                 img: 'https://i.imgur.com/MaC8BD8.png',
                 check: function(logs) {
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    return Object.values(byDay).some(v => v > 61);
+                    return logs.length > 61;
                 }
             },
             {
@@ -1611,9 +1633,7 @@
                 description: 'Clôturer 10 tickets en une seule journée',
                 img: 'https://i.imgur.com/ziLlvJr.png',
                 check: function(logs) {
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    return Object.values(byDay).some(v => v >= 10);
+                    return logs.length >= 10;
                 }
             },
             {
@@ -1623,18 +1643,25 @@
                 description: 'Clôturer 7 tickets en moins d\'une heure',
                 img: 'https://i.imgur.com/t5qs7s8.png',
                 check: function(logs) {
-                    // On trie les logs par date+heure croissante
+                    // On trie les logs par heure croissante
                     const sorted = logs
-                        .filter(l => l.date && l.time)
-                        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+                        .filter(l => l.time)
+                        .sort((a, b) => a.time.localeCompare(b.time));
+                    
                     // Pour chaque log, on regarde s'il y a 7 clôtures dans la même heure glissante
                     for (let i = 0; i <= sorted.length - 7; i++) {
                         const first = sorted[i];
                         const last = sorted[i + 6];
-                        // On convertit date+time en timestamp
-                        const start = new Date(first.date + 'T' + (first.time || '00:00')).getTime();
-                        const end = new Date(last.date + 'T' + (last.time || '00:00')).getTime();
-                        if (end - start <= 60 * 60 * 1000) { // 1 heure en ms
+                        
+                        // Convertir les heures en minutes pour faciliter la comparaison
+                        const [firstHour, firstMin] = first.time.split(':').map(Number);
+                        const [lastHour, lastMin] = last.time.split(':').map(Number);
+                        
+                        const firstMinutes = firstHour * 60 + firstMin;
+                        const lastMinutes = lastHour * 60 + lastMin;
+                        
+                        // Vérifier si les 7 clôtures sont dans la même heure
+                        if (lastMinutes - firstMinutes <= 60) {
                             return true;
                         }
                     }
@@ -1648,7 +1675,6 @@
                 description: 'Rester plus de 50 minutes avec un client',
                 img: 'https://i.imgur.com/I0qNYnJ.png',
                 check: function(logs) {
-                    // On cherche un log avec une durée >= 50 minutes
                     return logs.some(l => l.duree && Number(l.duree) >= 50);
                 }
             },
@@ -1659,7 +1685,6 @@
                 description: 'Rester plus de 2h avec un client au téléphone',
                 img: 'https://i.imgur.com/EeN6147.png',
                 check: function(logs) {
-                    // On cherche un log avec une durée >= 120 minutes
                     return logs.some(l => l.duree && Number(l.duree) >= 120);
                 }
             },
@@ -1670,10 +1695,7 @@
                 description: '20 appels jours',
                 img: 'https://i.imgur.com/kz6asVd.png',
                 check: function(logs) {
-                    // On cherche un jour avec au moins 20 clôtures
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    return Object.values(byDay).some(v => v >= 20);
+                    return logs.length >= 20;
                 }
             },
             {
@@ -1683,10 +1705,7 @@
                 description: "30 appels en une journée",
                 img: 'https://i.imgur.com/Z0dagDT.png',
                 check: function(logs) {
-                    // On cherche un jour avec au moins 30 clôtures
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    return Object.values(byDay).some(v => v >= 30);
+                    return logs.length >= 30;
                 }
             },
             {
@@ -1723,17 +1742,16 @@
                 img: 'https://i.imgur.com/roeGJ7X.png',
                 hidden: true,
                 check: function(logs) {
-                    // Cherche un vendredi avec au moins 7 appels avant 12h
-                    const byDay = {};
-                    logs.forEach(l => {
-                        if (l.date && l.time) {
-                            const dateObj = new Date(l.date + 'T' + (l.time || '00:00'));
-                            if (dateObj.getDay() === 5 && dateObj.getHours() < 12) {
-                                byDay[l.date] = (byDay[l.date]||0)+1;
-                            }
-                        }
-                    });
-                    return Object.values(byDay).some(v => v >= 7);
+                    // Vérifie si c'est un vendredi
+                    const today = new Date();
+                    if (today.getDay() !== 5) return false;
+                    
+                    // Compte les appels avant 12h
+                    return logs.filter(l => {
+                        if (!l.time) return false;
+                        const [hours] = l.time.split(':').map(Number);
+                        return hours < 12;
+                    }).length >= 7;
                 }
             },
             {
@@ -1744,82 +1762,18 @@
                 img: 'https://i.imgur.com/sMlUdBf.png',
                 hidden: true,
                 check: function(logs) {
-                    // Cherche un vendredi avec au moins 14 appels avant 12h
-                    const byDay = {};
-                    logs.forEach(l => {
-                        if (l.date && l.time) {
-                            const dateObj = new Date(l.date + 'T' + (l.time || '00:00'));
-                            if (dateObj.getDay() === 5 && dateObj.getHours() < 12) {
-                                byDay[l.date] = (byDay[l.date]||0)+1;
-                            }
-                        }
-                    });
-                    return Object.values(byDay).some(v => v >= 14);
+                    // Vérifie si c'est un vendredi
+                    const today = new Date();
+                    if (today.getDay() !== 5) return false;
+                    
+                    // Compte les appels avant 12h
+                    return logs.filter(l => {
+                        if (!l.time) return false;
+                        const [hours] = l.time.split(':').map(Number);
+                        return hours < 12;
+                    }).length >= 14;
                 }
-            },
-            {
-                id: 'la_machine',
-                name: 'La Machine',
-                phrase: 'Il ne mange pas. Il ne dort pas. Il clôture.',
-                description: 'Faire minimum 20 appels par jour du lundi au vendredi (5 jours ouvrés consécutifs)',
-                img: 'https://i.imgur.com/ampUz8N.png',
-                hidden: true,
-                check: function(logs) {
-                    // On cherche 5 jours consécutifs avec au moins 20 appels chaque jour (lundi à vendredi)
-                    const byDay = {};
-                    logs.forEach(l => { if (l.date) byDay[l.date] = (byDay[l.date]||0)+1; });
-                    const dates = Object.keys(byDay).sort();
-                    if (dates.length < 5) return false;
-                    // Convertit les dates en timestamps pour vérifier la suite
-                    const timestamps = dates.map(d => new Date(d).getTime());
-                    for (let i = 0; i <= timestamps.length - 5; i++) {
-                        let ok = true;
-                        for (let j = 0; j < 5; j++) {
-                            const d = new Date(dates[i+j]);
-                            // Vérifie que le premier jour est un lundi
-                            if (j === 0 && d.getDay() !== 1) { ok = false; break; }
-                            // Vérifie que chaque jour est consécutif
-                            if (j > 0 && timestamps[i+j] - timestamps[i+j-1] !== 24*60*60*1000) { ok = false; break; }
-                            if (byDay[dates[i+j]] < 20) { ok = false; break; }
-                        }
-                        if (ok) return true;
-                    }
-                    return false;
-                }
-            },
-            {
-                id: 'maitre_eclair',
-                name: 'Eclairs du Maître des appels',
-                img: 'https://i.imgur.com/sKtiPmj.png',
-                description: 'Ornement exclusif pour le rang MAÎTRE DES APPELS',
-                unlock: user => getCurrentRank(user.xp).name.startsWith('Maître des appels'),
-            },
-            {
-                id: 'maitre_eclair',
-                name: 'Eclairs du Maître des appels',
-                img: 'https://i.imgur.com/sKtiPmj.png',
-                description: 'Ornement exclusif pour le rang MAÎTRE DES APPELS',
-                unlock: user => user.xp >= 23750,
-            },
-            {
-                id: 'diamant',
-                name: 'Aura du Diamant',
-                img: 'https://i.imgur.com/JLyduRZ.png',
-                description: 'Ornement exclusif pour le rang DIAMANT',
-                unlock: user => user.xp >= 12500,
-            },
-            {
-                id: 'platine',
-                name: 'Aura du Platine',
-                img: 'https://i.imgur.com/2gpOrLT.png',
-                description: 'Ornement exclusif pour le rang PLATINE',
-                minRank: 'Platine IV',
-                unlock: user => {
-                    const userRank = getCurrentRank(user.xp).name;
-                    return getRankIndex(userRank) >= getRankIndex('Platine IV');
-                }
-            },
-            // D'autres badges à venir...
+            }
         ];
 
         // Ajout du bouton Badges dans le menu
@@ -2228,8 +2182,8 @@
 
         // Modification de la fonction awardXPToUser pour inclure les PC
         const originalAwardXPToUser = awardXPToUser;
-        awardXPToUser = function(userName, amount, typeCloture = 'normal') {
-            originalAwardXPToUser(userName, amount, typeCloture);
+        awardXPToUser = function(userName, amount, typeCloture = 'normal', duree = 0) {
+            originalAwardXPToUser(userName, amount, typeCloture, duree);
 
             // Vérifier si l'utilisateur a atteint 50 appels pour attribuer des PC
             firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(snapshot => {
@@ -2242,15 +2196,23 @@
 
         // Vérification des badges à chaque cloture
         function checkAndUnlockBadges(userName, logs) {
+            // Ne garder que les logs du jour en cours
+            const today = new Date().toISOString().slice(0, 10);
+            const todayLogs = logs.filter(log => log.date === today);
+
             firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges').once('value').then(snapshot => {
                 const unlocked = snapshot.val() || {};
                 allBadges.forEach(badge => {
-                    if (typeof badge.check === 'function' && !unlocked[badge.id] && badge.check(logs)) {
-                        // Débloque le badge
-                        firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
-                        // Attribue 100 XP pour l'obtention du badge
-                        awardXPToUser(userName, 100, 'badge');
-                        showBadgeUnlockedNotification(badge);
+                    if (typeof badge.check === 'function' && !unlocked[badge.id]) {
+                        // Vérifier le badge uniquement avec les logs du jour
+                        if (badge.check(todayLogs)) {
+                            console.log('[Gamification] Badge débloqué :', badge.id);
+                            // Débloque le badge
+                            firebase.database().ref('users/' + encodeURIComponent(userName) + '/badges/' + badge.id).set(true);
+                            // Attribue 100 XP pour l'obtention du badge
+                            awardXPToUser(userName, 100, 'badge');
+                            showBadgeUnlockedNotification(badge);
+                        }
                     }
                 });
             });
@@ -2325,8 +2287,8 @@
             checkAndAwardPCForRankUp(userName, currentRank.name);
         };
         // Ajout d'un hook sur la cloture pour les PC (sans toucher à l'XP)
-        awardXPToUser = function(userName, amount, typeCloture = 'normal') {
-            originalAwardXPToUser(userName, amount, typeCloture);
+        awardXPToUser = function(userName, amount, typeCloture = 'normal', duree = 0) {
+            originalAwardXPToUser(userName, amount, typeCloture, duree);
             // Vérifier les paliers de 50 appels
             firebase.database().ref('users/' + encodeURIComponent(userName) + '/clotures_log').once('value').then(snapshot => {
                 const logs = snapshot.val() ? Object.values(snapshot.val()) : [];
@@ -2599,6 +2561,8 @@
                 nameFlame.style.animation = 'flameTextAnim 2s linear infinite alternate';
                 nameFlame.style.textShadow = '0 0 16px #ff9800,0 0 32px #ffd700,0 0 12px #fff';
                 // Construction finale
+                mainWrapper.style.marginLeft = '0.2cm';
+                nameFlame.style.marginLeft = '12px';
                 mainWrapper.appendChild(flamesBg);
                 mainWrapper.appendChild(wrapper);
                 mainWrapper.appendChild(nameFlame);
@@ -2701,6 +2665,8 @@
                 nameThunder.style.animation = 'thunderTextAnim 2s linear infinite alternate';
                 nameThunder.style.textShadow = '0 0 16px #8f00ff,0 0 32px #00eaff,0 0 12px #fff';
                 // Construction finale
+                mainWrapper.style.marginLeft = '0.2cm';
+                nameThunder.style.marginLeft = '12px';
                 mainWrapper.appendChild(thunderBg);
                 mainWrapper.appendChild(wrapper);
                 mainWrapper.appendChild(nameThunder);
@@ -2788,7 +2754,7 @@
                 nameDiamond.style.webkitTextFillColor = 'transparent';
                 nameDiamond.style.animation = 'diamondTextAnim 2s linear infinite alternate';
                 nameDiamond.style.textShadow = '0 0 12px #00eaff,0 0 24px #00bfff,0 0 8px #fff';
-                nameDiamond.style.marginLeft = '10px';
+                nameDiamond.style.marginLeft = '12px';
                 // Ajoute le GIF diamant à droite du texte
                 const sparkle = document.createElement('img');
                 sparkle.src = 'https://cdn.pixabay.com/animation/2024/02/22/14/55/14-55-54-406_256.gif';
@@ -2801,6 +2767,8 @@
                 sparkle.style.opacity = '0.85';
                 nameDiamond.appendChild(sparkle);
                 // Construction finale
+                mainWrapper.style.marginLeft = '0.2cm';
+                nameDiamond.style.marginLeft = '12px';
                 mainWrapper.appendChild(wrapper);
                 mainWrapper.appendChild(nameDiamond);
                 cell.innerHTML = '';
@@ -2881,8 +2849,10 @@
                 namePlatine.style.position = 'relative';
                 namePlatine.style.color = '#7ed6df';
                 namePlatine.style.textShadow = '0 0 8px #7ed6df, 0 0 16px #fff';
-                namePlatine.style.marginLeft = '10px';
+                namePlatine.style.marginLeft = '12px';
                 // Construction finale
+                mainWrapper.style.marginLeft = '0.2cm';
+                namePlatine.style.marginLeft = '12px';
                 mainWrapper.appendChild(wrapper);
                 mainWrapper.appendChild(namePlatine);
                 cell.innerHTML = '';

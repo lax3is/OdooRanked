@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo Gamification
 // @namespace    http://tampermonkey.net/
-// @version      3.0.0
+// @version      3.0.1
 // @description  Add gamification system to Odoo helpdesk with custom rank logos
 // @author       Alexis.Sair
 // @match        https://winprovence.odoo.com/*
@@ -2312,6 +2312,16 @@
             const st = document.createElement('style');
             st.id = 'ticket-theme-styles';
             st.innerHTML = `
+            /* Boutons arrondis global (toutes variantes) */
+            body.gm-theme-enabled .btn,
+            body.gm-theme-enabled button,
+            body.gm-theme-enabled .o_form_statusbar .btn,
+            body.gm-theme-enabled .o_control_panel .btn,
+            body.gm-theme-enabled .o_statusbar_status .btn,
+            body.gm-theme-enabled .o_statusbar_buttons .btn,
+            body.gm-theme-enabled .o_cp_pager .btn,
+            body.gm-theme-enabled .o_pager .btn,
+            body.gm-theme-enabled .btn-group .btn { border-radius: 9999px !important; }
             /* Scopé par classe body.gm-theme-*, appliqué uniquement sur pages Tickets */
             body.gm-theme-enabled.gm-theme-dark_plus .o_content,
             body.gm-theme-enabled.gm-theme-dark_plus .o_form_view,
@@ -2446,6 +2456,116 @@
             body.gm-theme-enabled.gm-theme-dark_plus .btn-primary { background:linear-gradient(90deg,#26e0ce,#209cff) !important; border:none !important; color:#fff !important; }
             body.gm-theme-enabled.gm-theme-dark_plus .badge, body.gm-theme-enabled.gm-theme-dark_plus .o_tag { background:#1e2530 !important; color:#dfe3e8 !important; border:1px solid #26e0ce33; }
             body.gm-theme-enabled.gm-theme-dark_plus .o_kanban_view .o_kanban_record { background:#161b22 !important; border:1px solid #262c36 !important; box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+
+            /* === OLED Black + Bleu Odoo pour dark_plus (overrides) === */
+            body.gm-theme-enabled.gm-theme-dark_plus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_web_client,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_action_manager,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_action,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_content,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_kanban_view { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus header.o_navbar,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_main_navbar { background-color:#000000 !important; border-color:#0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_bottom,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_top { border-color:#0d0d0d !important; background-image:none !important; background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_breadcrumb,
+            body.gm-theme-enabled.gm-theme-dark_plus ol.breadcrumb { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar { background:#000000 !important; border-bottom:1px solid #0d0d0d !important; }
+            /* Form / widgets */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view .o_form_sheet,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view .o_inner_group,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view .o_group,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view .o_notebook,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_view .o_chatter { background:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_Chatter_container,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_mail_thread,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_thread_window,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_MessageList { background:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_mail_thread .o_Message,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_attachment_box { background:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_sheet_bg { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_sheet_bg .o_form_sheet { background-color:#000000 !important; border-color:#0d0d0d !important; }
+            /* Tabs (notebook) */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_notebook .nav-tabs,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_notebook_headers .nav.nav-tabs,
+            body.gm-theme-enabled.gm-theme-dark_plus ul.nav.nav-tabs.flex-row.flex-nowrap { background:#000000 !important; border-color:#0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_notebook .nav-tabs .nav-link.active { background:#050505 !important; border-color:#0d0d0d !important; }
+            /* Listes */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_renderer .o_group_header,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_renderer .o_group_has_content { background:#000000 !important; border-bottom:1px solid #0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view table,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .table,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view thead th,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table thead th { background:#000000 !important; border-color:#0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view tbody tr,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_data_row { background-color:#000000 !important; border-color:#0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view tbody tr:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_data_row:hover { background:#0a0a0a !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tbody { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .table-striped > tbody > tr:nth-of-type(odd) { background-color:#050505 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_group_header { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tbody tr.o_data_row > td { background:#000000 !important; background-image:none !important; border-top-color:#0d0d0d !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tbody tr.o_data_row:hover > td { background:#0a0a0a !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view.table-striped > tbody > tr.o_data_row:nth-of-type(odd) > td { background:#050505 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_header,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_has_content { background-color:#000000 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_header > th,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_header > td,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_has_content > th,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_list_view .o_list_table tr.o_group_has_content > td { background-color:#000000 !important; border-top:1px solid #0d0d0d !important; border-bottom:1px solid #0d0d0d !important; }
+            /* Kanban */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_kanban_view .o_kanban_record { background:#000000 !important; border:1px solid #0d0d0d !important; box-shadow: 0 6px 16px rgba(0,0,0,0.5); }
+            /* Boutons secondaires */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel .btn:not(.btn-primary):not(.btn-danger):not(.btn-success):not(.o_cp_buttons .btn),
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar .btn,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_status .btn,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_buttons .btn:not(.o_cp_buttons .btn),
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_pager .btn,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_pager .btn,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-group .btn { background-color:#0a0a0a !important; border-color:#1a1a1a !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_status .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_buttons .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_pager .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_pager .btn:hover,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-group .btn:hover { background-color:#111111 !important; border-color:#222222 !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_status .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_buttons .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-group .btn:active { background-color:#000000 !important; border-color:#1a1a1a !important; }
+            /* Bouton principal (bleu Odoo clair) */
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-primary { background:linear-gradient(90deg,#43b0ff,#209cff) !important; border:none !important; color:#ffffff !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-primary:hover { background:linear-gradient(90deg,#5cc0ff,#27adff) !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-primary:focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-primary:focus-visible { outline:none !important; box-shadow: 0 0 0 2px rgba(32,156,255,0.25), 0 6px 18px rgba(32,156,255,0.35) !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-primary:active { box-shadow: 0 0 0 3px rgba(32,156,255,0.35), 0 0 14px rgba(32,156,255,0.55) inset !important; background: #1aa0ff !important; }
+            /* Reflet bleu léger pour boutons secondaires au focus/clic */
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel .btn:not(.btn-primary):not(.btn-danger):not(.btn-success):not(.o_cp_buttons .btn):focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar .btn:focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_status .btn:focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_buttons .btn:not(.o_cp_buttons .btn):focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_pager .btn:focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_pager .btn:focus,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-group .btn:focus { outline:none !important; box-shadow: 0 0 0 2px rgba(32,156,255,0.18) !important; }
+            body.gm-theme-enabled.gm-theme-dark_plus .o_control_panel .btn:not(.btn-primary):not(.btn-danger):not(.btn-success):not(.o_cp_buttons .btn):active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_form_statusbar .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_status .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_statusbar_buttons .btn:not(.o_cp_buttons .btn):active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_cp_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-dark_plus .btn-group .btn:active { box-shadow: 0 0 0 3px rgba(32,156,255,0.25) !important; }
+            /* Badges / tags avec liseré bleu Odoo (clair) */
+            body.gm-theme-enabled.gm-theme-dark_plus .badge,
+            body.gm-theme-enabled.gm-theme-dark_plus .o_tag { background:#0a0a0a !important; color:#dfe3e8 !important; border:1px solid rgba(32,156,255,0.33) !important; }
 
             body.gm-theme-enabled.gm-theme-redblack .o_content,
             body.gm-theme-enabled.gm-theme-redblack .o_form_view,
@@ -2640,6 +2760,71 @@
             body.gm-theme-enabled.gm-theme-blue .o_button_box .btn.btn-light:hover,
             body.gm-theme-enabled.gm-theme-blue button.oe_stat_button:hover,
             body.gm-theme-enabled.gm-theme-blue button.oe_stat_button.btn-light:hover { background:#152031 !important; border-color:#1f354e !important; color:#ffffff !important; }
+            /* Blue: style moderne pour boutons principaux */
+            body.gm-theme-enabled.gm-theme-blue .btn-primary {
+                background: linear-gradient(180deg, #5cc0ff 0%, #209cff 100%) !important;
+                border: 1px solid #2aa7ff !important;
+                color: #ffffff !important;
+                box-shadow: 0 8px 22px rgba(32,156,255,0.25), inset 0 1px 0 rgba(255,255,255,0.12) !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .btn-primary:hover {
+                background: linear-gradient(180deg, #6ad0ff 0%, #27adff 100%) !important;
+                box-shadow: 0 10px 26px rgba(32,156,255,0.35), inset 0 1px 0 rgba(255,255,255,0.16) !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .btn-primary:focus,
+            body.gm-theme-enabled.gm-theme-blue .btn-primary:focus-visible {
+                outline: none !important;
+                box-shadow: 0 0 0 2px rgba(32,156,255,0.25), 0 8px 24px rgba(32,156,255,0.35) !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .btn-primary:active {
+                background: #1aa0ff !important;
+                box-shadow: 0 0 0 3px rgba(32,156,255,0.35), inset 0 0 14px rgba(32,156,255,0.45) !important;
+            }
+            /* Blue: boutons secondaires en outline translucide */
+            body.gm-theme-enabled.gm-theme-blue .o_control_panel .btn:not(.btn-primary):not(.btn-danger):not(.btn-success):not(.o_cp_buttons .btn),
+            body.gm-theme-enabled.gm-theme-blue .o_form_statusbar .btn,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_status .btn,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_buttons .btn:not(.o_cp_buttons .btn),
+            body.gm-theme-enabled.gm-theme-blue .o_cp_pager .btn,
+            body.gm-theme-enabled.gm-theme-blue .o_pager .btn,
+            body.gm-theme-enabled.gm-theme-blue .btn-group .btn {
+                background: transparent !important;
+                border: 1px solid #2a3a56 !important;
+                color: #dbe8ff !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .o_control_panel .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .o_form_statusbar .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_status .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_buttons .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .o_cp_pager .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .o_pager .btn:hover,
+            body.gm-theme-enabled.gm-theme-blue .btn-group .btn:hover {
+                background: rgba(32,156,255,0.08) !important;
+                border-color: #3a5a86 !important;
+                color: #ffffff !important;
+                box-shadow: 0 0 0 2px rgba(32,156,255,0.18) !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .o_control_panel .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .o_form_statusbar .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_status .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_buttons .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .o_cp_pager .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .o_pager .btn:focus,
+            body.gm-theme-enabled.gm-theme-blue .btn-group .btn:focus {
+                outline: none !important;
+                box-shadow: 0 0 0 2px rgba(32,156,255,0.22) !important;
+            }
+            body.gm-theme-enabled.gm-theme-blue .o_control_panel .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .o_form_statusbar .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_status .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .o_statusbar_buttons .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .o_cp_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .o_pager .btn:active,
+            body.gm-theme-enabled.gm-theme-blue .btn-group .btn:active {
+                background: rgba(32,156,255,0.16) !important;
+                border-color: #2aa7ff !important;
+                box-shadow: 0 0 0 3px rgba(32,156,255,0.25) !important;
+            }
             /* Blue surcouches: boutons droits, sélection, texte */
             body.gm-theme-enabled.gm-theme-blue .o_form_statusbar_buttons .btn { background-color: revert !important; border-color: revert !important; color: revert !important; box-shadow: revert !important; filter: revert !important; }
             body.gm-theme-enabled.gm-theme-blue .o_list_view .o_list_table tbody tr.o_data_row.o_selected { background-color:#162031 !important; color:#e6edf3 !important; }
@@ -3235,7 +3420,8 @@
             firebase.database().ref('users/' + encodeURIComponent(userName)).once('value').then(snap => {
                 const d = snap.val() || {};
                 const themeRaw = d.ticketTheme || 'none';
-                const theme = themeRaw === 'pink' ? 'light' : themeRaw; // migration: ancien "rose pourpre" -> "clair rose"
+                let theme = themeRaw === 'pink' ? 'light' : themeRaw; // migration: ancien "rose pourpre" -> "clair rose"
+                if (themeRaw === 'green') theme = 'dark_plus'; // migration: suppression du thème vert -> bascule sur dark_plus
                 const userPrestige = Number(d.prestige || 0);
                 clearThemes();
                 // Verrou: les thèmes se débloquent au Prestige 2
@@ -3250,6 +3436,9 @@
                 // Persister la migration en base (une seule fois)
                 if (themeRaw === 'pink') {
                     firebase.database().ref('users/' + encodeURIComponent(userName)).update({ ticketTheme: 'light' });
+                }
+                if (themeRaw === 'green') {
+                    firebase.database().ref('users/' + encodeURIComponent(userName)).update({ ticketTheme: 'dark_plus' });
                 }
             });
         }
@@ -4366,8 +4555,7 @@
                     { id: 'none', label: 'Aucun (par défaut Odoo)' },
                     { id: 'dark_plus', label: 'Dark Odoo+ (à activer avec le mode sombre d\'Odoo)' },
                     { id: 'redblack', label: 'Rouge / Noir (à activer avec le mode sombre d\'Odoo)' },
-                    { id: 'blue', label: 'Bleu nuit (à activer avec le mode sombre d\'Odoo)' },
-                    { id: 'green', label: 'Vert sombre (à activer avec le mode sombre d\'Odoo)' },
+                    { id: 'blue', label: 'Bleu (à activer avec le mode sombre d\'Odoo)' },
                     { id: 'light', label: 'Clair (rose bonbon) (à activer avec le thème clair d\'Odoo)' }
                   ];
                   html += `
